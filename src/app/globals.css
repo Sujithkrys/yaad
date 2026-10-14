@@ -19,6 +19,8 @@
   --good-bg: #E6F6EE;
   --warn: #B7791F;
   --warn-bg: #FCF1DC;
+  --bad: #D2433B;
+  --bad-bg: #FBE8E6;
   --tip-bg: #12131A;
   --tip-ink: #F2F3F7;
   --shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 0 0 1px rgba(20,24,50,.05), 0 18px 40px -18px rgba(30,36,80,.28), 0 4px 10px -4px rgba(30,36,80,.12);
@@ -31,7 +33,7 @@
   :root:not([data-theme="light"]) {
     --page: #0D0E12; --hatch: rgba(160,168,210,.05); --guide: #25272F; --shell: #17181E; --card: #1E1F26; --card-hover: #262831;
     --ink: #F1F2F7; --ink-2: #A3A7B8; --ink-3: #6F7385; --line: #2A2C35;
-    --accent: #FF7340; --blue: #6F86FF; --good: #3DDC97; --good-bg: rgba(61,220,151,.12); --warn: #F2B84B; --warn-bg: rgba(242,184,75,.12);
+    --accent: #FF7340; --blue: #6F86FF; --good: #3DDC97; --good-bg: rgba(61,220,151,.12); --warn: #F2B84B; --warn-bg: rgba(242,184,75,.12); --bad: #FF7A70; --bad-bg: rgba(255,122,112,.12);
     --tip-bg: #F1F2F7; --tip-ink: #12131A;
     --shadow: 0 0 0 1px rgba(255,255,255,.05), 0 24px 48px -20px rgba(0,0,0,.7);
     color-scheme: dark;
@@ -40,7 +42,7 @@
 :root[data-theme="dark"] {
   --page: #0D0E12; --hatch: rgba(160,168,210,.05); --guide: #25272F; --shell: #17181E; --card: #1E1F26; --card-hover: #262831;
   --ink: #F1F2F7; --ink-2: #A3A7B8; --ink-3: #6F7385; --line: #2A2C35;
-  --accent: #FF7340; --blue: #6F86FF; --good: #3DDC97; --good-bg: rgba(61,220,151,.12); --warn: #F2B84B; --warn-bg: rgba(242,184,75,.12);
+  --accent: #FF7340; --blue: #6F86FF; --good: #3DDC97; --good-bg: rgba(61,220,151,.12); --warn: #F2B84B; --warn-bg: rgba(242,184,75,.12); --bad: #FF7A70; --bad-bg: rgba(255,122,112,.12);
   --tip-bg: #F1F2F7; --tip-ink: #12131A;
   --shadow: 0 0 0 1px rgba(255,255,255,.05), 0 24px 48px -20px rgba(0,0,0,.7);
   color-scheme: dark;
@@ -65,6 +67,8 @@
   --color-good-bg: var(--good-bg);
   --color-warn: var(--warn);
   --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
   --color-tip-bg: var(--tip-bg);
   --color-tip-ink: var(--tip-ink);
   --font-telugu: var(--telugu);
@@ -259,12 +263,6 @@ button, select { font: inherit; color: inherit; }
 .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 12px); background: var(--tip-bg); color: var(--tip-ink); padding: 10px 14px; border-radius: 12px; font-size: 12.5px; opacity: 0; pointer-events: none; transition: opacity .15s ease, transform .15s ease; z-index: 10; }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
-/* Empty state */
-.empty { max-width: 460px; margin: 48px auto; text-align: center; }
-.empty .card { padding: 28px 24px; display: grid; justify-items: center; gap: 14px; }
-.empty-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--card-hover); color: var(--ink-2); display: grid; place-items: center; }
-.empty h2 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
-.empty p { margin: 0; color: var(--ink-2); font-size: 13px; }
 
 /* Dev gallery */
 .gallery { display: grid; gap: 24px; max-width: 1100px; margin-inline: auto; }
@@ -299,10 +297,7 @@ button, select { font: inherit; color: inherit; }
 
 /* ---------- Voice ---------- */
 .speak { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.icon-btn { width: 26px; height: 26px; flex: none; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink-2); cursor: pointer; transition: background .12s ease, color .12s ease; }
-.icon-btn:hover { background: var(--card-hover); color: var(--ink); }
-.icon-btn:focus-visible { border-radius: 999px; }
-.icon-btn[data-state="playing"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.icon-btn[data-state="playing"] { color: var(--accent); }
 .icon-btn[data-state="error"] { color: var(--warn); }
 .speak-error { color: var(--warn); font-size: 11.5px; }
 .spin { animation: spin .8s linear infinite; }
@@ -312,7 +307,6 @@ button, select { font: inherit; color: inherit; }
 /* ---------- Voice studio ---------- */
 .studio { max-width: 640px; margin-inline: auto; }
 .studio-form { padding: 16px; display: grid; gap: 16px; }
-.field { display: grid; gap: 7px; min-width: 0; }
 .field-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .field-row .field { flex: 1 1 180px; }
 .field .hint { color: var(--ink-3); font-size: 12px; }

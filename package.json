@@ -10,6 +10,7 @@
     "tts:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/tts-test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
