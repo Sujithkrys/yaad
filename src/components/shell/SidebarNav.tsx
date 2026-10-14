@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { ClockIcon, FamilyIcon, GridIcon, PhoneIcon, SettingsIcon } from "@/components/ui";
+import { ClockIcon, FamilyIcon, GridIcon, PhoneIcon, SettingsIcon, WaveIcon } from "@/components/ui";
 
 type NavItem = {
   href: string;
@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { href: "/reminders", label: "Reminders", Icon: ClockIcon },
   { href: "/family", label: "Family", Icon: FamilyIcon, count: 4 },
   { href: "/history", label: "Call history", Icon: PhoneIcon },
+  { href: "/studio", label: "Voice studio", Icon: WaveIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 

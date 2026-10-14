@@ -65,12 +65,6 @@ export const ADHERENCE_DAYS = 14;
 export const adherenceDelta = "3.1%";
 export const lastSynced = "7:02 PM";
 
-export const reminderKindLabel: Record<ReminderKind, string> = {
-  tablet: "tablet",
-  walk: "walk",
-  visit: "doctor visit",
-};
-
 /** Deterministic PRNG (mulberry32) so server and client render the same grid. */
 export function rng(seed: number) {
   return function () {

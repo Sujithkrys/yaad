@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { ArrowRightIcon, Card, MonoLabel, Panel, PanelFoot, PanelHead, PanelTitle, SparkleIcon } from "@/components/ui";
 import { buildWaveform, lastCall } from "@/lib/sample-data";
+import { voicesFor } from "@/lib/voices";
+import { SpeakButton } from "@/components/voice/SpeakButton";
 
 export function LastCallPanel() {
   const wave = buildWaveform();
+  // Telugu voice for the agent lines; the button is hidden until one is configured.
+  const voice = voicesFor("te-IN")[0];
   return (
     <Panel aria-labelledby="c-title">
       <PanelHead>
@@ -32,7 +36,7 @@ export function LastCallPanel() {
         </div>
       </Card>
 
-      <Card className="lines">
+      <Card className="lines fill">
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }} aria-label="Call transcript">
           {lastCall.transcript.map((l) => (
             <li key={l.at} className={`line ${l.speaker}`}>
@@ -44,9 +48,14 @@ export function LastCallPanel() {
                 </div>
                 <div className="en">{l.english}</div>
               </div>
-              <MonoLabel as="span" className="ts">
-                {l.at}
-              </MonoLabel>
+              <span className="end">
+                {voice && l.speaker === "agent" ? (
+                  <SpeakButton text={l.native} languageCode="te-IN" speaker={voice.id} label={`agent line at ${l.at}`} />
+                ) : null}
+                <MonoLabel as="span" className="ts">
+                  {l.at}
+                </MonoLabel>
+              </span>
             </li>
           ))}
         </ol>

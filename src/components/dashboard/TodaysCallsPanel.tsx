@@ -111,7 +111,7 @@ export function TodaysCallsPanel() {
         </div>
       </Card>
 
-      <Card className="rows">
+      <Card className="rows fill">
         {visible.length ? (
           visible.map((c) => <CallRow key={c.id} call={c} selected={c.id === selected} onSelect={setSelected} />)
         ) : (

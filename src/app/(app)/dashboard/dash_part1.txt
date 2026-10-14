@@ -1,0 +1,58 @@
+'use client';
+import React, { useState, useRef, useMemo } from 'react';
+import Link from 'next/link';
+import { Panel, PanelHead, PanelFoot, Card, MonoLabel, Pill, Button, SegmentedControl, ChipSelect, TickBar, TickItem } from '@/components/ui';
+import { INITIAL_CALLS, CallItem, MetricType, buildAdherenceData, dateOf, PEOPLE } from '@/lib/sample-data';
+
+function fmt(h: number, m: number) {
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 || 12;
+  return `${hh}:${m < 10 ? '0' : ''}${m} ${ap}`;
+}
+
+export default function DashboardPage() {
+  const [calls, setCalls] = useState<CallItem[]>(INITIAL_CALLS);
+  const [selectedCallId, setSelectedCallId] = useState<number>(5);
+  const [whoCallFilter, setWhoCallFilter] = useState<string>('all');
+
+  const visibleCalls = calls.filter((c) => whoCallFilter === 'all' || c.who === whoCallFilter);
+  const confirmedCount = calls.filter((c) => c.s === 'confirmed').length;
+
+
+  function finishCall(id: number) {
+    setCalls((prev) =>
+      prev.map((c) =>
+        c.id === id && c.s === 'calling'
+          ? { ...c, s: 'confirmed', note: fmt(19, 3) }
+          : c
+      )
+    );
+  }
+
+  function handleCallCta() {
+    const sel = calls.find((c) => c.id === selectedCallId);
+    if (!sel || sel.s === 'confirmed' || sel.s === 'calling') return;
+
+    setCalls((prev) =>
+      prev.map((c) => (c.id === sel.id ? { ...c, s: 'calling', note: 'ringing' } : c))
+    );
+    setTimeout(() => finishCall(sel.id), 3500);
+  }
+
+  const axisTicks: TickItem[] = Array.from({ length: 32 }).map((_, i) => {
+    const hit = calls.find((c) => (c.h - 6) * 2 + (c.m >= 30 ? 1 : 0) === i);
+    if (hit && (who,CallFilter === 'all' || hit.who === whoCallFilter)) {
+      return {
+        variant: hit.s,
+        isLarge: true,
+        isSelected: hit.id === selectedCallId,
+      };
+    }
+    return {
+      variant: hit ? hit.s : 'empty',
+      isLarge: hit ? true : false,
+      opacity: hit ? 0.25 : 1,
+    };
+  });
+
+  const selectedCall = calls.find((c) => c.id === selectedCallId);

@@ -135,3 +135,36 @@ export function SparkleIcon({ size = 13, ...p }: IconProps) {
     </svg>
   );
 }
+
+export function SpeakerIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.4)}>
+      <path d="M2.5 6v4h2.6L8.5 13V3L5.1 6z" />
+      <path d="M10.8 5.6a3.4 3.4 0 010 4.8M12.6 3.8a6 6 0 010 8.4" />
+    </svg>
+  );
+}
+
+export function StopIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden {...p}>
+      <rect x="4" y="4" width="8" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+export function SpinnerIcon({ size = 14, className, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.6)} className={["spin", className].filter(Boolean).join(" ")}>
+      <path d="M8 2.2a5.8 5.8 0 105.8 5.8" />
+    </svg>
+  );
+}
+
+export function WaveIcon(p: IconProps) {
+  return (
+    <svg {...stroke(p)}>
+      <path d="M2 7v2M4.6 5v6M7.2 2.5v11M9.8 5v6M12.4 6.5v3M14.5 7.5v1" />
+    </svg>
+  );
+}

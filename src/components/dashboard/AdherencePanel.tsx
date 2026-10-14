@@ -8,7 +8,6 @@ import {
   buildAdherence,
   lastSynced,
   people,
-  reminderKindLabel,
   type ReminderKind,
 } from "@/lib/sample-data";
 import { AdherenceGrid } from "./AdherenceGrid";
@@ -114,7 +113,6 @@ export function AdherencePanel() {
       <AdherenceGrid
         data={s.data}
         kind={kind}
-        kindLabel={reminderKindLabel[kind]}
         missed={s.missed}
         onKindChange={setKind}
       />

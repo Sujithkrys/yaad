@@ -40,12 +40,11 @@ type Tip = { title: string; body: string; cell: HTMLElement } | null;
 type AdherenceGridProps = {
   data: Record<string, DayResult[]>;
   kind: ReminderKind;
-  kindLabel: string;
   missed: number;
   onKindChange: (k: ReminderKind) => void;
 };
 
-export function AdherenceGrid({ data, kind, kindLabel, missed, onKindChange }: AdherenceGridProps) {
+export function AdherenceGrid({ data, kind, missed, onKindChange }: AdherenceGridProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const [tip, setTip] = useState<Tip>(null);
@@ -80,12 +79,12 @@ export function AdherenceGrid({ data, kind, kindLabel, missed, onKindChange }: A
   }
 
   return (
-    <Card className="grid-card" ref={cardRef} onMouseOver={onOver} onFocus={onOver} onMouseOut={onOut} onBlur={onOut}>
+    <Card className="grid-card fill" ref={cardRef} onMouseOver={onOver} onFocus={onOver} onMouseOut={onOut} onBlur={onOut}>
       <div className="grid-top">
         <div>
           <h3>Family · {people.length}</h3>
           <MonoLabel>
-            {ADHERENCE_DAYS} days · {missed} missed · {kindLabel}
+            {ADHERENCE_DAYS} days · {missed} missed
           </MonoLabel>
         </div>
         <SegmentedControl label="Reminder type" options={KIND_OPTIONS} value={kind} onChange={onKindChange} />
@@ -135,7 +134,7 @@ export function AdherenceGrid({ data, kind, kindLabel, missed, onKindChange }: A
         </span>
         <span>
           <i style={{ background: "color-mix(in srgb, var(--blue) 42%, var(--card))" }} />
-          After retry
+          Retry
         </span>
         <span>
           <i
@@ -148,7 +147,7 @@ export function AdherenceGrid({ data, kind, kindLabel, missed, onKindChange }: A
         </span>
         <span>
           <i style={{ boxShadow: "inset 0 0 0 1px var(--line)" }} />
-          Not yet
+          Pending
         </span>
       </div>
 
