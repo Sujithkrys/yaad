@@ -1,26 +1,26 @@
 import { MonoLabel, Pill } from "@/components/ui";
-import { fmtTs } from "@/lib/app/time";
-import type { CallRecord } from "@/lib/app/types";
+import { fmtTs } from "@/lib/time";
+import type { TodayItem } from "@/lib/types";
 
-type CallRowProps = { call: CallRecord; selected: boolean; onSelect: (id: string) => void };
+type CallRowProps = { item: TodayItem; selected: boolean; onSelect: (key: string) => void };
 
-export function CallRow({ call, selected, onSelect }: CallRowProps) {
-  const meta = `${call.reminder.text} · ${fmtTs(call.scheduledTs)}`;
+export function CallRow({ item, selected, onSelect }: CallRowProps) {
+  const meta = `${item.text} · ${fmtTs(item.scheduledAt)}`;
   return (
-    <button className="row" type="button" data-s={call.status} aria-pressed={selected} onClick={() => onSelect(call.id)}>
+    <button className="row" type="button" data-s={item.status} aria-pressed={selected} onClick={() => onSelect(item.key)}>
       <span className="rd" aria-hidden="true" />
       <span style={{ minWidth: 0 }}>
         <span className="who" style={{ display: "block" }}>
-          {call.person.name}
+          {item.personName}
         </span>
         <MonoLabel as="span" className="meta" style={{ display: "block" }} title={meta}>
           {meta}
         </MonoLabel>
       </span>
       <span className="end">
-        <Pill variant={call.status} />
+        <Pill variant={item.status} />
         <MonoLabel as="span" className="when">
-          {call.note}
+          {item.note}
         </MonoLabel>
       </span>
     </button>

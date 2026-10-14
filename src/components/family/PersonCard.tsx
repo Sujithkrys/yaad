@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useDialogs } from "@/components/app/DialogsProvider";
 import { useToast } from "@/components/shell/Toast";
-import { Avatar, Button, Card, EditIcon, MonoLabel, Pill, PlusIcon, cx } from "@/components/ui";
-import { removePerson, updatePerson } from "@/lib/app/store";
-import type { Person, Reminder } from "@/lib/app/types";
+import { Avatar, Button, Card, EditIcon, MonoLabel, Pill, PlusIcon } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import type { Person, Reminder } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
 
 function formatPhone(p: string) {
@@ -18,27 +18,30 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
   const dialogs = useDialogs();
   const say = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
   const lang = LANGUAGES.find((l) => l.code === p.lang)?.label ?? p.lang;
   const active = reminders.filter((r) => r.active).length;
 
-  const status =
-    p.consent === "pending" ? (
-      <Pill variant="retry">Waiting</Pill>
-    ) : p.paused ? (
-      <Pill variant="scheduled">Paused</Pill>
-    ) : (
-      <Pill variant="confirmed">Agreed</Pill>
-    );
+  async function run(action: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    try {
+      await action();
+      say(done);
+    } catch (e) {
+      say((e as Error).message);
+      setBusy(false);
+    }
+  }
 
   return (
-    <Card className={cx("pcard")}>
-      <div className={cx("top", p.paused && "paused")}>
+    <Card className="pcard">
+      <div className="top">
         <Avatar name={p.name} size="lg" />
         <div>
           <h3>{p.name}</h3>
           <MonoLabel>{p.relation}</MonoLabel>
         </div>
-        {status}
+        {p.consent === "pending" ? <Pill variant="retry">Waiting</Pill> : <Pill variant="confirmed">Agreed</Pill>}
       </div>
 
       <div className="kv">
@@ -75,14 +78,7 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
             <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
               Cancel
             </Button>
-            <Button
-              variant="bad"
-              size="sm"
-              onClick={() => {
-                removePerson(p.id);
-                say(`${p.name} removed.`);
-              }}
-            >
+            <Button variant="bad" size="sm" disabled={busy} onClick={() => run(() => api.deletePerson(p.id), `${p.name} removed.`)}>
               Remove
             </Button>
           </div>
@@ -91,10 +87,7 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
         <div className="row-acts">
           {p.consent === "pending" ? (
             <>
-              <Button size="sm" onClick={() => {
-                  updatePerson(p.id, { consent: "granted" });
-                  say(`${p.name} agreed to calls.`);
-                }}>
+              <Button size="sm" disabled={busy} onClick={() => run(() => api.grantConsent(p.id), `${p.name} agreed to calls.`).then(() => setBusy(false))}>
                 Mark as agreed
               </Button>
               <Button variant="ghost" size="sm" onClick={() => say(`Consent message sent again to ${p.name}.`)}>
@@ -102,22 +95,10 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
               </Button>
             </>
           ) : (
-            <>
-              <Button size="sm" onClick={() => dialogs.newReminder(p.id)}>
-                <PlusIcon size={12} />
-                Reminder
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  updatePerson(p.id, { paused: !p.paused });
-                  say(p.paused ? `Calls to ${p.name} resumed.` : `Calls to ${p.name} paused.`);
-                }}
-              >
-                {p.paused ? "Resume calls" : "Pause calls"}
-              </Button>
-            </>
+            <Button size="sm" onClick={() => dialogs.newReminder(p.id)}>
+              <PlusIcon size={12} />
+              Reminder
+            </Button>
           )}
           <span style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
             <button type="button" className="icon-btn" aria-label={`Edit ${p.name}`} title="Edit" onClick={() => dialogs.editPerson(p.id)}>

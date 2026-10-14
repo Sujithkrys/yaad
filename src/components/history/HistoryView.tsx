@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { Loading } from "@/components/app/Loading";
 import { useDialogs } from "@/components/app/DialogsProvider";
+import { LoadError } from "@/components/dashboard/DashboardView";
 import { Card, EmptyState, MonoLabel, Pill, PhoneIcon } from "@/components/ui";
-import { callHistory } from "@/lib/app/calls";
-import { useAppState, useNow } from "@/lib/app/store";
-import { fmtDate, fmtDuration, fmtTs } from "@/lib/app/time";
-import type { CallStatus } from "@/lib/app/types";
+import { useCalls, useFamily } from "@/lib/client/hooks";
+import { fmtDate, fmtDuration, fmtTs } from "@/lib/time";
+import type { CallState } from "@/lib/types";
 
-const STATUSES: { value: "all" | CallStatus; label: string }[] = [
-  { value: "all", label: "All results" },
+const STATUSES: { value: "" | CallState; label: string }[] = [
+  { value: "", label: "All results" },
   { value: "confirmed", label: "Confirmed" },
   { value: "missed", label: "Missed" },
   { value: "retry", label: "Retry" },
@@ -18,21 +18,16 @@ const STATUSES: { value: "all" | CallStatus; label: string }[] = [
 ];
 
 export function HistoryView() {
-  const state = useAppState();
-  const now = useNow(15_000);
   const dialogs = useDialogs();
+  const family = useFamily();
   const [query, setQuery] = useState("");
-  const [who, setWho] = useState("all");
-  const [status, setStatus] = useState<"all" | CallStatus>("all");
-  if (!state) return <Loading />;
+  const [person, setPerson] = useState("");
+  const [status, setStatus] = useState("");
+  const q = useDeferredValue(query.trim());
+  const calls = useCalls({ person, status, q });
 
-  const q = query.trim().toLowerCase();
-  const calls = callHistory(state, now, 14).filter(
-    (c) =>
-      (who === "all" || String(c.person.id) === who) &&
-      (status === "all" || c.status === status) &&
-      (!q || c.person.name.toLowerCase().includes(q) || c.reminder.text.toLowerCase().includes(q)),
-  );
+  if (calls.error) return <LoadError message={calls.error.message} />;
+  if (!calls.data) return <Loading />;
 
   return (
     <div className="view-stack">
@@ -46,15 +41,15 @@ export function HistoryView() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <select className="input" aria-label="Person" value={who} onChange={(e) => setWho(e.target.value)}>
-            <option value="all">All family</option>
-            {state.family.map((p) => (
+          <select className="input" aria-label="Person" value={person} onChange={(e) => setPerson(e.target.value)}>
+            <option value="">All family</option>
+            {family.data?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
-          <select className="input" aria-label="Result" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+          <select className="input" aria-label="Result" value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -65,7 +60,7 @@ export function HistoryView() {
       </Card>
 
       <Card className="list">
-        {calls.length ? (
+        {calls.data.length ? (
           <>
             <div className="thead mono" aria-hidden="true">
               <span>When</span>
@@ -75,20 +70,20 @@ export function HistoryView() {
               <span>Talk</span>
               <span>Tries</span>
             </div>
-            {calls.map((c) => (
+            {calls.data.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 className="trow"
                 onClick={() => dialogs.showCall(c)}
-                aria-label={`${c.person.name}, ${c.reminder.text}, ${fmtDate(c.scheduledTs)} ${fmtTs(c.scheduledTs)}, ${c.status}. Open details`}
+                aria-label={`${c.personName}, ${c.text}, ${fmtDate(c.scheduledAt)} ${fmtTs(c.scheduledAt)}, ${c.status}. Open details`}
               >
                 <MonoLabel as="span">
-                  {fmtDate(c.scheduledTs)} · {fmtTs(c.scheduledTs)}
+                  {fmtDate(c.scheduledAt)} · {fmtTs(c.scheduledAt)}
                 </MonoLabel>
-                <span style={{ fontWeight: 500 }}>{c.person.name}</span>
+                <span style={{ fontWeight: 500 }}>{c.personName}</span>
                 <span className="h-m" style={{ color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.reminder.text}
+                  {c.text}
                 </span>
                 <span>
                   <Pill variant={c.status} />
@@ -97,7 +92,7 @@ export function HistoryView() {
                   {fmtDuration(c.durationSec)}
                 </MonoLabel>
                 <MonoLabel as="span" className="h-m num">
-                  {c.attempts}
+                  {c.attempt}
                 </MonoLabel>
               </button>
             ))}
@@ -106,8 +101,12 @@ export function HistoryView() {
           <EmptyState
             small
             icon={<PhoneIcon />}
-            title="No calls match"
-            description="Try another person or result, or clear the search."
+            title={q || person || status ? "No calls match" : "No calls yet"}
+            description={
+              q || person || status
+                ? "Try another person or result, or clear the search."
+                : "Every call, with its transcript and result, will be listed here."
+            }
           />
         )}
       </Card>

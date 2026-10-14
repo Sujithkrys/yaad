@@ -1,20 +1,22 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { CloseIcon, Modal, MonoLabel, Pill } from "@/components/ui";
-import { useAppState } from "@/lib/app/store";
-import { fmtDate, fmtDuration, fmtTs } from "@/lib/app/time";
-import type { CallRecord } from "@/lib/app/types";
+import { useSettings } from "@/lib/client/hooks";
+import { fmtDate, fmtDuration, fmtTs } from "@/lib/time";
+import type { Call, Response } from "@/lib/types";
 import { LANGUAGES, voicesFor } from "@/lib/voices";
 import { Transcript } from "./Transcript";
 
-const OUTCOME_TEXT = {
+const RESPONSE_TEXT: Record<Response, string> = {
   taken: "Said they had done it",
   later: "Said they would do it later",
   not_taken: "Said they had not done it",
   no_answer: "Did not answer",
-} as const;
+  unclear: "Answer was not clear",
+};
 
-export function CallDrawer({ call, onClose }: { call: CallRecord | null; onClose: () => void }) {
+export function CallDrawer({ call, onClose }: { call: Call | null; onClose: () => void }) {
   return (
     <Modal open={call !== null} onClose={onClose} labelledBy="call-title" drawer>
       {call ? <CallDetails call={call} onClose={onClose} /> : null}
@@ -22,19 +24,17 @@ export function CallDrawer({ call, onClose }: { call: CallRecord | null; onClose
   );
 }
 
-function CallDetails({ call, onClose }: { call: CallRecord; onClose: () => void }) {
-  const state = useAppState();
-  const { person, reminder } = call;
-  const langLabel = LANGUAGES.find((l) => l.code === person.lang)?.label ?? person.lang;
-  const voice = voicesFor(person.lang)[0];
-  const retryMin = state?.settings.retryMin ?? 10;
-  const alerted = call.status === "missed" && state?.settings.alertFamily;
+function CallDetails({ call, onClose }: { call: Call; onClose: () => void }) {
+  const settings = useSettings().data;
+  const langLabel = LANGUAGES.find((l) => l.code === call.lang)?.label ?? call.lang;
+  const voice = voicesFor(call.lang)[0];
+  const retryMin = settings?.retryMin ?? 10;
 
   return (
     <div className="dlg">
       <div className="dlg-head">
         <h2 id="call-title">
-          {person.name} · {reminder.text}
+          {call.personName} · {call.text}
         </h2>
         <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
           <CloseIcon />
@@ -44,28 +44,25 @@ function CallDetails({ call, onClose }: { call: CallRecord; onClose: () => void 
       <div className="dlg-body">
         <div className="meta-grid">
           <Meta label="Status" value={<Pill variant={call.status} />} />
-          <Meta label="Scheduled" value={`${fmtDate(call.scheduledTs)} · ${fmtTs(call.scheduledTs)}`} />
-          <Meta label="Answered" value={call.answeredTs ? fmtTs(call.answeredTs) : "–"} />
-          <Meta label="Attempts" value={String(call.attempts)} />
+          <Meta label="Scheduled" value={`${fmtDate(call.scheduledAt)} · ${fmtTs(call.scheduledAt)}`} />
+          <Meta label="Finished" value={call.doneAt ? fmtTs(call.doneAt) : "–"} />
+          <Meta label="Attempts" value={String(call.attempt)} />
           <Meta label="Talk time" value={fmtDuration(call.durationSec)} />
-          <Meta label="Result" value={call.outcome ? OUTCOME_TEXT[call.outcome] : "In progress"} />
+          <Meta label="Result" value={call.response ? RESPONSE_TEXT[call.response] : "In progress"} />
         </div>
 
-        {call.firstOutcome ? (
-          <p className="warn">
-            First call: {OUTCOME_TEXT[call.firstOutcome].toLowerCase()}. Retried after {retryMin} minutes.
-          </p>
-        ) : null}
+        {call.attempt > 1 && call.status === "confirmed" ? <p className="warn">Taken after a retry, {retryMin} minutes after the first call.</p> : null}
         {call.status === "missed" ? (
-          <p className="err">{alerted ? "Missed twice. Family was alerted." : "Missed twice. Family alerts are off in settings."}</p>
+          <p className="err">{call.alerted ? "Missed. Family was alerted." : "Missed. No alert was sent."}</p>
         ) : null}
+        {call.manual ? <MonoLabel>Placed by hand with call now</MonoLabel> : null}
 
         <div className="field">
           <span className="lbl">Sent to the voice agent</span>
           <div className="vars">
-            <div><span>name</span><span>{person.name}</span></div>
-            <div><span>reminder</span><span>{reminder.text}</span></div>
-            <div><span>language</span><span>{person.lang} · {langLabel}</span></div>
+            <div><span>name</span><span>{call.personName}</span></div>
+            <div><span>reminder</span><span>{call.text}</span></div>
+            <div><span>language</span><span>{call.lang} · {langLabel}</span></div>
             <div><span>voice</span><span>{voice?.id ?? "not set"}</span></div>
             <div><span>model</span><span>bulbul:v4-flash</span></div>
             <div><span>retry_after</span><span>{retryMin} min</span></div>
@@ -74,10 +71,10 @@ function CallDetails({ call, onClose }: { call: CallRecord; onClose: () => void 
 
         <div className="field">
           <span className="lbl">Transcript</span>
-          {call.outcome && call.outcome !== "no_answer" ? (
-            <Transcript lang={person.lang} name={person.name} reminder={reminder.text} outcome={call.outcome} />
+          {call.lines.length ? (
+            <Transcript lines={call.lines} lang={call.lang} name={call.personName} />
           ) : (
-            <MonoLabel>{call.outcome === "no_answer" ? "No answer on either attempt" : "Call in progress"}</MonoLabel>
+            <MonoLabel>{call.response === "no_answer" ? "No answer" : "No transcript for this call"}</MonoLabel>
           )}
         </div>
       </div>
@@ -85,7 +82,7 @@ function CallDetails({ call, onClose }: { call: CallRecord; onClose: () => void 
   );
 }
 
-function Meta({ label, value }: { label: string; value: React.ReactNode }) {
+function Meta({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <MonoLabel>{label}</MonoLabel>

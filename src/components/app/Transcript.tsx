@@ -1,19 +1,17 @@
 import { MonoLabel } from "@/components/ui";
 import { SpeakButton } from "@/components/voice/SpeakButton";
-import type { Outcome } from "@/lib/app/types";
-import { transcriptFor } from "@/lib/conversation";
+import type { TranscriptLine } from "@/lib/types";
 import { voicesFor } from "@/lib/voices";
 
-type Props = { lang: string; name: string; reminder: string; outcome: Outcome };
+type Props = { lines: TranscriptLine[]; lang: string; name: string };
 
 /** Call transcript in the drawer style; agent lines get a play button when a voice exists. */
-export function Transcript({ lang, name, reminder, outcome }: Props) {
+export function Transcript({ lines, lang, name }: Props) {
   const voice = voicesFor(lang)[0];
-  const lines = transcriptFor(lang, name, reminder, outcome);
   return (
     <ol style={{ listStyle: "none", margin: 0, padding: 0 }} aria-label="Call transcript">
-      {lines.map((l) => (
-        <li key={l.at} className={`tline ${l.role}`}>
+      {lines.map((l, i) => (
+        <li key={`${l.at}-${i}`} className={`tline ${l.role}`}>
           <span className="sq" aria-hidden="true" />
           <div>
             <span className="sr-only">{l.role === "agent" ? "Agent:" : `${name}:`}</span>

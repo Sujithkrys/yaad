@@ -4,14 +4,16 @@ import { useDialogs } from "@/components/app/DialogsProvider";
 import { useToast } from "@/components/shell/Toast";
 import { Avatar, Button, EditIcon, MonoLabel, SpeakerIcon, SpinnerIcon, StopIcon, Toggle, TrashIcon, cx } from "@/components/ui";
 import { useSpeech } from "@/components/voice/useSpeech";
-import { removeReminder, updateReminder } from "@/lib/app/store";
-import { fmtHHMM, inQuietHours } from "@/lib/app/time";
-import type { Person, Reminder, Settings } from "@/lib/app/types";
+import { useState } from "react";
+import { api } from "@/lib/client/api";
+import { inQuiet } from "@/lib/derive";
+import { fmtHHMM } from "@/lib/time";
+import type { Person, Reminder, Settings } from "@/lib/types";
 import { renderGreeting } from "@/lib/greetings";
 import { LANGUAGES, voicesFor } from "@/lib/voices";
 
 const REPEAT_LABEL = { daily: "Every day", weekdays: "Weekdays", once: "Once" } as const;
-const KIND_LABEL = { tablet: "Tablet", walk: "Walk", visit: "Visit" } as const;
+const KIND_LABEL = { tablet: "Tablet", walk: "Walk", visit: "Visit", other: "Other" } as const;
 
 type Props = {
   reminder: Reminder;
@@ -25,14 +27,28 @@ export function ReminderRow({ reminder: r, person, settings, confirming, onConfi
   const dialogs = useDialogs();
   const say = useToast();
   const speech = useSpeech();
-  const voice = voicesFor(person.lang)[0];
-  const lang = LANGUAGES.find((l) => l.code === person.lang)?.label ?? person.lang;
-  const quiet = inQuietHours(r.time, settings);
-  const blocked = person.consent === "pending" ? "Waiting for consent" : person.paused ? "Person paused" : quiet ? "In quiet hours" : null;
+  const [busy, setBusy] = useState(false);
+  const code = r.lang ?? person.lang;
+  const voice = voicesFor(code)[0];
+  const lang = LANGUAGES.find((l) => l.code === code)?.label ?? code;
+  const quiet = inQuiet(r.time, settings);
+  const blocked = person.consent === "pending" ? "Waiting for consent" : quiet ? "In quiet hours" : null;
+
+  async function run(action: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    try {
+      await action();
+      say(done);
+    } catch (e) {
+      say((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function play() {
     if (speech.state === "playing" || speech.state === "loading") return speech.stop();
-    if (voice) speech.play({ text: renderGreeting(person.lang, person.name, r.text), languageCode: person.lang, speaker: voice.id });
+    if (voice) speech.play({ text: renderGreeting(code, person.name, r.text), languageCode: code, speaker: voice.id });
   }
 
   return (
@@ -58,11 +74,11 @@ export function ReminderRow({ reminder: r, person, settings, confirming, onConfi
       <MonoLabel className="c-lang">{lang}</MonoLabel>
       <Toggle
         checked={r.active}
+        disabled={busy}
         label={`${r.active ? "Pause" : "Resume"} ${r.text} for ${person.name}`}
-        onChange={(on) => {
-          updateReminder(r.id, { active: on });
-          say(on ? `${r.text} for ${person.name} resumed.` : `${r.text} for ${person.name} paused.`);
-        }}
+        onChange={(on) =>
+          run(() => api.updateReminder(r.id, { active: on }), on ? `${r.text} for ${person.name} resumed.` : `${r.text} for ${person.name} paused.`)
+        }
       />
       <div className="acts">
         <button
@@ -95,11 +111,8 @@ export function ReminderRow({ reminder: r, person, settings, confirming, onConfi
             <Button
               variant="bad"
               size="sm"
-              onClick={() => {
-                removeReminder(r.id);
-                onConfirm(false);
-                say("Reminder deleted.");
-              }}
+              disabled={busy}
+              onClick={() => run(() => api.deleteReminder(r.id), "Reminder deleted.").then(() => onConfirm(false))}
             >
               Delete
             </Button>

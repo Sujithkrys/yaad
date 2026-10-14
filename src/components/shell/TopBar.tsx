@@ -4,22 +4,21 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useDialogs } from "@/components/app/DialogsProvider";
 import { Button, MonoLabel, PlusIcon } from "@/components/ui";
-import { callHistory, todayCalls } from "@/lib/app/calls";
-import { useAppState, useNow } from "@/lib/app/store";
-import { fmtLongDate, greetingWord } from "@/lib/app/time";
-import type { AppState } from "@/lib/app/types";
+import { useCalls, useDashboard, useFamily, useOwnerName, useReminders } from "@/lib/client/hooks";
+import { fmtLongDate, greetingWord } from "@/lib/time";
 
 type Head = { title: string; sub: string; actions?: ReactNode };
 
-function plural(n: number, word: string) {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function TopBar() {
-  const pathname = usePathname();
-  const state = useAppState();
-  const now = useNow(30_000);
+  const path = usePathname();
   const dialogs = useDialogs();
+  const family = useFamily().data;
+  const reminders = useReminders().data;
+  const dash = useDashboard().data;
+  const calls = useCalls({}).data;
+  const name = useOwnerName();
 
   const newReminder = (
     <Button onClick={() => dialogs.newReminder()}>
@@ -34,7 +33,33 @@ export function TopBar() {
     </Button>
   );
 
-  const head = state ? headFor(pathname, state, now, { newReminder, addPerson }) : { title: "", sub: "" };
+  let head: Head;
+  if (path.startsWith("/reminders")) {
+    const active = reminders?.filter((r) => r.active).length ?? 0;
+    head = { title: "Reminders", sub: reminders ? `${active} active · ${reminders.length - active} paused` : "", actions: newReminder };
+  } else if (path.startsWith("/family")) {
+    const pending = family?.filter((p) => p.consent === "pending").length ?? 0;
+    head = {
+      title: "Family",
+      sub: family ? `${plural(family.length, "person", "people")}${pending ? ` · ${pending} waiting for consent` : ""}` : "",
+      actions: addPerson,
+    };
+  } else if (path.startsWith("/history")) {
+    const missed = calls?.filter((c) => c.status === "missed").length ?? 0;
+    head = { title: "Call history", sub: calls ? `${plural(calls.length, "call")} · ${missed} missed` : "" };
+  } else if (path.startsWith("/settings")) {
+    head = { title: "Settings", sub: "Calls, quiet hours and alerts" };
+  } else if (path.startsWith("/studio")) {
+    head = { title: "Voice studio", sub: "Hear the agent before it calls" };
+  } else {
+    const items = dash?.todayItems ?? [];
+    const retries = items.filter((c) => c.status === "retry").length;
+    head = {
+      title: dash ? `Good ${greetingWord(dash.now)}${name ? `, ${name}` : ""}` : "",
+      sub: dash ? `${fmtLongDate(dash.now)} · ${plural(items.length, "call")} today · ${retries} retry pending` : "",
+      actions: newReminder,
+    };
+  }
 
   return (
     <header className="topbar">
@@ -45,34 +70,4 @@ export function TopBar() {
       {head.actions ? <div className="top-actions">{head.actions}</div> : null}
     </header>
   );
-}
-
-function headFor(path: string, s: AppState, now: number, a: { newReminder: ReactNode; addPerson: ReactNode }): Head {
-  if (path.startsWith("/reminders")) {
-    const active = s.reminders.filter((r) => r.active).length;
-    return { title: "Reminders", sub: `${active} active · ${s.reminders.length - active} paused`, actions: a.newReminder };
-  }
-  if (path.startsWith("/family")) {
-    const pending = s.family.filter((p) => p.consent === "pending").length;
-    return {
-      title: "Family",
-      sub: `${s.family.length} ${s.family.length === 1 ? "person" : "people"}${pending ? ` · ${pending} waiting for consent` : ""}`,
-      actions: a.addPerson,
-    };
-  }
-  if (path.startsWith("/history")) {
-    const calls = callHistory(s, now, 14);
-    const missed = calls.filter((c) => c.status === "missed").length;
-    return { title: "Call history", sub: `Last 14 days · ${plural(calls.length, "call")} · ${missed} missed` };
-  }
-  if (path.startsWith("/settings")) return { title: "Settings", sub: "Calls, quiet hours and alerts" };
-  if (path.startsWith("/studio")) return { title: "Voice studio", sub: "Hear the agent before it calls" };
-
-  const today = todayCalls(s, now);
-  const retries = today.filter((c) => c.status === "retry").length;
-  return {
-    title: `Good ${greetingWord(now)}, ${s.user.name}`,
-    sub: `${fmtLongDate(now)} · ${plural(today.length, "call")} today · ${retries} retry pending`,
-    actions: a.newReminder,
-  };
 }

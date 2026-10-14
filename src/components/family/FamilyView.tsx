@@ -2,18 +2,22 @@
 
 import { Loading } from "@/components/app/Loading";
 import { useDialogs } from "@/components/app/DialogsProvider";
+import { LoadError } from "@/components/dashboard/DashboardView";
 import { Button, Card, EmptyState, FamilyIcon, PlusIcon } from "@/components/ui";
-import { adherence } from "@/lib/app/calls";
-import { useAppState, useNow } from "@/lib/app/store";
+import { useDashboard, useFamily, useReminders } from "@/lib/client/hooks";
 import { PersonCard } from "./PersonCard";
 
 export function FamilyView() {
-  const state = useAppState();
-  const now = useNow(60_000);
+  const family = useFamily();
+  const reminders = useReminders();
+  const dash = useDashboard();
   const dialogs = useDialogs();
-  if (!state) return <Loading />;
 
-  if (!state.family.length) {
+  const error = family.error ?? reminders.error;
+  if (error) return <LoadError message={error.message} />;
+  if (!family.data || !reminders.data) return <Loading variant="cards" />;
+
+  if (!family.data.length) {
     return (
       <div className="view-stack">
         <Card>
@@ -33,16 +37,15 @@ export function FamilyView() {
     );
   }
 
-  const tablets = adherence(state, "tablet", now);
-  const pctById = new Map(tablets.rows.map((r) => [r.person.id, r.pct]));
+  const pctById = new Map(dash.data?.adherence.tablet.rows.map((r) => [r.personId, r.pct]) ?? []);
 
   return (
     <div className="fam-grid">
-      {state.family.map((p) => (
+      {family.data.map((p) => (
         <PersonCard
           key={p.id}
           person={p}
-          reminders={state.reminders.filter((r) => r.personId === p.id)}
+          reminders={reminders.data!.filter((r) => r.personId === p.id)}
           adherencePct={pctById.get(p.id) ?? null}
         />
       ))}

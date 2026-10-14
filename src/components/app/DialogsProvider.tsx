@@ -1,23 +1,23 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { CallRecord } from "@/lib/app/types";
+import type { Call } from "@/lib/types";
 import { CallDrawer } from "./CallDrawer";
 import { PersonDialog } from "./PersonDialog";
 import { ReminderDialog } from "./ReminderDialog";
 
 type Open =
-  | { kind: "reminder"; reminderId?: number; personId?: number }
-  | { kind: "person"; personId?: number }
-  | { kind: "call"; call: CallRecord }
+  | { kind: "reminder"; reminderId?: string; personId?: string }
+  | { kind: "person"; personId?: string }
+  | { kind: "call"; call: Call }
   | null;
 
 type Dialogs = {
-  newReminder: (personId?: number) => void;
-  editReminder: (reminderId: number) => void;
+  newReminder: (personId?: string) => void;
+  editReminder: (reminderId: string) => void;
   addPerson: () => void;
-  editPerson: (personId: number) => void;
-  showCall: (call: CallRecord) => void;
+  editPerson: (personId: string) => void;
+  showCall: (call: Call) => void;
 };
 
 const DialogsContext = createContext<Dialogs | null>(null);

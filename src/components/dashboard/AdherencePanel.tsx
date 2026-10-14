@@ -3,29 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/shell/Toast";
 import { Button, Card, KebabIcon, MonoLabel, Panel, PanelFoot, PanelHead, PanelTitle, StatBar } from "@/components/ui";
-import { ADHERENCE_DAYS, adherence } from "@/lib/app/calls";
-import { fmtTs } from "@/lib/app/time";
-import type { AppState, ReminderKind } from "@/lib/app/types";
+import { fmtTs } from "@/lib/time";
+import type { Dashboard } from "@/lib/types";
 import { AdherenceGrid } from "./AdherenceGrid";
 import { Sparkline } from "./Sparkline";
 
-export function AdherencePanel({ state, now }: { state: AppState; now: number }) {
-  const [kind, setKind] = useState<ReminderKind>("tablet");
+type Kind = keyof Dashboard["adherence"];
+
+type Props = { adherence: Dashboard["adherence"]; alerts: boolean; syncedAt: number };
+
+export function AdherencePanel({ adherence, alerts, syncedAt }: Props) {
+  const [kind, setKind] = useState<Kind>("tablet");
   const [sent, setSent] = useState(false);
   const sentTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = useToast();
-  const s = adherence(state, kind, now);
-  const alerts = state.settings.alertFamily;
+  const s = adherence[kind];
+  const days = s.days.length;
 
   useEffect(() => () => clearTimeout(sentTimer.current), []);
 
   const p1 = s.total ? Math.round((s.first / s.total) * 100) : 0;
   const p2 = s.total ? Math.round((s.retried / s.total) * 100) : 0;
-  const delta = Math.round(s.delta * 10) / 10;
 
   function sendSummary() {
     setSent(true);
-    say(`Weekly summary sent to ${state.user.name}.`);
+    say("Weekly summary sent.");
     clearTimeout(sentTimer.current);
     sentTimer.current = setTimeout(() => setSent(false), 2200);
   }
@@ -36,7 +38,7 @@ export function AdherencePanel({ state, now }: { state: AppState; now: number })
         <PanelTitle id="b-title" info="A day counts as taken when the person says yes on the first call or after a retry.">
           Adherence
         </PanelTitle>
-        <MonoLabel as="span">Last {ADHERENCE_DAYS} days</MonoLabel>
+        <MonoLabel as="span">Last {days} days</MonoLabel>
       </PanelHead>
 
       <Card className="hero-b">
@@ -46,19 +48,16 @@ export function AdherencePanel({ state, now }: { state: AppState; now: number })
             {s.total ? s.pct : "–"}
             <small style={{ marginLeft: 2, fontSize: 20 }}>%</small>
             {s.total ? (
-              <span
-                className="delta"
-                style={delta < 0 ? { background: "var(--bad-bg)", color: "var(--bad)" } : undefined}
-              >
-                <span aria-hidden="true">{delta < 0 ? "▼" : "▲"}</span>
-                <span className="sr-only">{delta < 0 ? "Down" : "Up"}</span> {Math.abs(delta).toFixed(1)}%
+              <span className="delta" style={s.delta < 0 ? { background: "var(--bad-bg)", color: "var(--bad)" } : undefined}>
+                <span aria-hidden="true">{s.delta < 0 ? "▼" : "▲"}</span>
+                <span className="sr-only">{s.delta < 0 ? "Down" : "Up"}</span> {Math.abs(s.delta).toFixed(1)}%
               </span>
             ) : null}
           </div>
           <Sparkline values={s.perDay} />
         </div>
         <MonoLabel style={{ marginTop: 10 }}>
-          vs previous {ADHERENCE_DAYS} days · {s.rows.length} people
+          vs previous {days} days · {s.rows.length} people
         </MonoLabel>
         <div className="stats3">
           <div className="stat">
@@ -88,14 +87,7 @@ export function AdherencePanel({ state, now }: { state: AppState; now: number })
         </div>
       </Card>
 
-      <AdherenceGrid
-        rows={s.rows}
-        dayStarts={s.dayStarts}
-        kind={kind}
-        missed={s.missed}
-        alerts={alerts}
-        onKindChange={setKind}
-      />
+      <AdherenceGrid rows={s.rows} days={s.days} kind={kind} missed={s.missed} alerts={alerts} onKindChange={setKind} />
 
       <PanelFoot>
         <div className="foot-left">
@@ -104,7 +96,7 @@ export function AdherencePanel({ state, now }: { state: AppState; now: number })
           </span>
           <MonoLabel as="span" className="live">
             <i className="dot" aria-hidden="true" />
-            Synced {fmtTs(now)}
+            Synced {fmtTs(syncedAt)}
           </MonoLabel>
         </div>
         <Button onClick={sendSummary} disabled={sent}>

@@ -1,4 +1,4 @@
-import type { CallStatus } from "@/lib/app/types";
+import type { CallStatus } from "@/lib/types";
 
 export const STATUS_LABEL: Record<CallStatus, string> = {
   confirmed: "Confirmed",

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "tts:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/tts-test.mjs"
+    "tts:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/tts-test.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
@@ -15,6 +16,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
+    "swr": "^2.5.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -25,7 +27,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.4"
   },
   "packageManager": "pnpm@12.11.2"
 }

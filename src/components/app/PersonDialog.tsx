@@ -3,8 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useToast } from "@/components/shell/Toast";
 import { Button, CloseIcon, Modal } from "@/components/ui";
-import { addPerson, updatePerson, useAppState } from "@/lib/app/store";
-import type { AppState } from "@/lib/app/types";
+import { api } from "@/lib/client/api";
+import { useFamily, useSettings } from "@/lib/client/hooks";
+import type { Lang, Person } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
 
 export const RELATIONS = ["Mother", "Father", "Grandmother", "Grandfather", "Spouse", "Other"];
@@ -15,40 +16,49 @@ export function cleanPhone(raw: string) {
   return /^[6-9]\d{9}$/.test(digits) ? digits : null;
 }
 
-type Props = { open: boolean; personId?: number; onClose: () => void };
+type Props = { open: boolean; personId?: string; onClose: () => void };
 
 export function PersonDialog(props: Props) {
-  const state = useAppState();
+  const family = useFamily();
+  const settings = useSettings();
   return (
-    <Modal open={props.open && Boolean(state)} onClose={props.onClose} labelledBy="per-title">
-      {state ? <PersonForm {...props} state={state} /> : null}
+    <Modal open={props.open && Boolean(family.data)} onClose={props.onClose} labelledBy="per-title">
+      {family.data ? <PersonForm {...props} family={family.data} defaultLang={settings.data?.defaultLang ?? "hi-IN"} /> : null}
     </Modal>
   );
 }
 
-function PersonForm({ state, personId, onClose }: Props & { state: AppState }) {
+function PersonForm({ family, defaultLang, personId, onClose }: Props & { family: Person[]; defaultLang: Lang }) {
   const say = useToast();
-  const existing = state.family.find((p) => p.id === personId);
+  const existing = family.find((p) => p.id === personId);
   const [name, setName] = useState(existing?.name ?? "");
   const [relation, setRelation] = useState(existing?.relation ?? "Mother");
   const [phone, setPhone] = useState(existing?.phone ?? "");
-  const [lang, setLang] = useState(existing?.lang ?? "te-IN");
-  const [error, setError] = useState<{ field: "name" | "phone"; text: string } | null>(null);
+  const [lang, setLang] = useState<Lang>(existing?.lang ?? defaultLang);
+  const [error, setError] = useState<{ field: "name" | "phone" | "server"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return setError({ field: "name", text: "Add the name they answer to, like Amma." });
     const digits = cleanPhone(phone);
     if (!digits) return setError({ field: "phone", text: "Enter a 10 digit mobile number." });
     const data = { name: name.trim(), relation, phone: digits, lang };
-    if (existing) {
-      updatePerson(existing.id, data);
-      say(`${data.name} updated.`);
-    } else {
-      addPerson(data);
-      say(`Consent message sent to ${data.name}. Calls start after they agree.`);
+    setSaving(true);
+    try {
+      if (existing) {
+        await api.updatePerson(existing.id, data);
+        say(`${data.name} updated.`);
+      } else {
+        await api.addPerson(data);
+        say(`Consent message sent to ${data.name}. Calls start after they agree.`);
+      }
+      onClose();
+    } catch (err) {
+      const text = (err as Error).message;
+      setError({ field: /mobile/i.test(text) ? "phone" : "server", text });
+      setSaving(false);
     }
-    onClose();
   }
 
   return (
@@ -100,7 +110,7 @@ function PersonForm({ state, personId, onClose }: Props & { state: AppState }) {
           </div>
           <div className="field">
             <label htmlFor="per-lang">Language</label>
-            <select id="per-lang" className="input" value={lang} onChange={(e) => setLang(e.target.value)}>
+            <select id="per-lang" className="input" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
                   {l.label}
@@ -124,7 +134,9 @@ function PersonForm({ state, personId, onClose }: Props & { state: AppState }) {
         <Button variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit">{existing ? "Save changes" : "Add person"}</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving…" : existing ? "Save changes" : "Add person"}
+        </Button>
       </div>
     </form>
   );

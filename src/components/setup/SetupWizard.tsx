@@ -6,9 +6,11 @@ import { cleanPhone, RELATIONS } from "@/components/app/PersonDialog";
 import { useToast } from "@/components/shell/Toast";
 import { Button, Card, MonoLabel, SegmentedControl, SpeakerIcon, SpinnerIcon, StopIcon } from "@/components/ui";
 import { useSpeech } from "@/components/voice/useSpeech";
-import { addPerson, addReminder, useAppState } from "@/lib/app/store";
-import { fmtHHMM, nextOnceDay } from "@/lib/app/time";
-import type { ReminderKind, Repeat } from "@/lib/app/types";
+import { guessKind } from "@/components/app/ReminderDialog";
+import { api } from "@/lib/client/api";
+import { useOwnerName } from "@/lib/client/hooks";
+import { fmtHHMM, nextOnceDay } from "@/lib/time";
+import type { Lang, Repeat } from "@/lib/types";
 import { englishGreeting } from "@/lib/conversation";
 import { renderGreeting } from "@/lib/greetings";
 import { LANGUAGES, NO_VOICE_HINT, voicesFor } from "@/lib/voices";
@@ -19,20 +21,21 @@ const STEPS = 3;
 export function SetupWizard() {
   const router = useRouter();
   const say = useToast();
-  const state = useAppState();
+  const ownerName = useOwnerName();
   const speech = useSpeech();
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Mother");
   const [phone, setPhone] = useState("");
-  const [lang, setLang] = useState("te-IN");
+  const [lang, setLang] = useState<Lang>("te-IN");
   const [text, setText] = useState("BP tablet");
   const [time, setTime] = useState("19:00");
   const [repeat, setRepeat] = useState<Repeat>("daily");
 
-  const owner = state?.user.name ?? "Your family";
+  const owner = ownerName || "Your family";
   const langLabel = LANGUAGES.find((l) => l.code === lang)?.label ?? lang;
   const voice = voicesFor(lang)[0];
   const preview = renderGreeting(lang, name.trim() || "Amma", text.trim() || "BP tablet");
@@ -51,21 +54,25 @@ export function SetupWizard() {
     finish();
   }
 
-  function finish() {
-    const digits = cleanPhone(phone);
-    if (!digits) return;
-    const personId = addPerson({ name: name.trim(), relation, phone: digits, lang });
-    const kind: ReminderKind = /walk/i.test(text) ? "walk" : /doctor|visit/i.test(text) ? "visit" : "tablet";
-    addReminder({
-      personId,
-      text: text.trim(),
-      kind,
-      time,
-      repeat,
-      onceDay: repeat === "once" ? nextOnceDay(time) : undefined,
-    });
-    say(`Consent message sent to ${name.trim()}. Calls start after they agree.`);
-    router.push("/family");
+  async function finish() {
+    setSaving(true);
+    try {
+      const person = await api.addPerson({ name: name.trim(), relation, phone, lang });
+      await api.addReminder({
+        personId: person.id,
+        text: text.trim(),
+        kind: guessKind(text),
+        time,
+        repeat,
+        onceDay: repeat === "once" ? nextOnceDay(time) : null,
+        lang: null,
+      });
+      say(`Consent message sent to ${person.name}. Calls start after they agree.`);
+      router.push("/family");
+    } catch (e) {
+      setError((e as Error).message);
+      setSaving(false);
+    }
   }
 
   return (
@@ -117,7 +124,7 @@ export function SetupWizard() {
                 </div>
                 <div className="field">
                   <label htmlFor="wz-lang">Language</label>
-                  <select id="wz-lang" className="input" value={lang} onChange={(e) => setLang(e.target.value)}>
+                  <select id="wz-lang" className="input" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
                     {LANGUAGES.map((l) => (
                       <option key={l.code} value={l.code}>
                         {l.label}
@@ -220,7 +227,9 @@ export function SetupWizard() {
           ) : (
             <MonoLabel as="span">Takes about a minute</MonoLabel>
           )}
-          <Button type="submit">{step < STEPS ? "Continue" : "Send and finish"}</Button>
+          <Button type="submit" disabled={saving}>
+            {step < STEPS ? "Continue" : saving ? "Sending…" : "Send and finish"}
+          </Button>
         </div>
       </form>
     </section>

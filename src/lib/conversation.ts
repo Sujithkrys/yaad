@@ -1,5 +1,5 @@
 import { renderGreeting } from "./greetings";
-import type { Outcome, TranscriptLine } from "./app/types";
+import type { Response, TranscriptLine } from "./types";
 
 type Replies = { taken: string; thanks: string; later: string; laterAgent: string; no: string; noAgent: string };
 
@@ -29,8 +29,8 @@ function stamp(sec: number) {
 }
 
 /** The scripted conversation for one call, in the person's language with an English gloss. */
-export function transcriptFor(lang: string, name: string, reminder: string, outcome: Outcome): TranscriptLine[] {
-  if (outcome === "no_answer") return [];
+export function transcriptFor(lang: string, name: string, reminder: string, outcome: Response): TranscriptLine[] {
+  if (outcome === "no_answer" || outcome === "unclear") return [];
   const N = NATIVE[lang] ?? EN;
   const lines: Omit<TranscriptLine, "at">[] = [
     { role: "agent", native: renderGreeting(lang, name, reminder), english: englishGreeting(name, reminder) },

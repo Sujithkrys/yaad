@@ -4,17 +4,16 @@ import Link from "next/link";
 import { ArrowRightIcon, Card, EmptyState, MonoLabel, Panel, PanelFoot, PanelHead, PanelTitle, SparkleIcon } from "@/components/ui";
 import { SpeakButton } from "@/components/voice/SpeakButton";
 import { useDialogs } from "@/components/app/DialogsProvider";
-import type { CallRecord } from "@/lib/app/types";
-import { transcriptFor } from "@/lib/conversation";
+import type { Call } from "@/lib/types";
 import { voicesFor } from "@/lib/voices";
 
-function waveform(call: CallRecord, bars = 64) {
+function waveform(call: Call, bars = 64) {
   let seed = [...call.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) | 0, 7);
   const rand = () => {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     return seed / 0x7fffffff;
   };
-  const total = Math.max(call.durationSec, 1);
+  const total = Math.max(call.durationSec ?? 0, 1);
   return Array.from({ length: bars }, (_, i) => {
     const sec = (i / bars) * total;
     const f = sec / total;
@@ -23,7 +22,7 @@ function waveform(call: CallRecord, bars = 64) {
   });
 }
 
-export function LastCallPanel({ call, alerts }: { call: CallRecord | undefined; alerts: boolean }) {
+export function LastCallPanel({ call, alerts }: { call: Call | null; alerts: boolean }) {
   const dialogs = useDialogs();
 
   if (!call) {
@@ -39,9 +38,8 @@ export function LastCallPanel({ call, alerts }: { call: CallRecord | undefined; 
     );
   }
 
-  const { person, reminder } = call;
-  const voice = voicesFor(person.lang)[0];
-  const lines = call.outcome ? transcriptFor(person.lang, person.name, reminder.text, call.outcome) : [];
+  const voice = voicesFor(call.lang)[0];
+  const lines = call.lines;
   const confirmed = call.status === "confirmed";
   const footnote = confirmed ? "no alert sent to family" : alerts ? "family alerted" : "family alerts are off";
 
@@ -58,10 +56,10 @@ export function LastCallPanel({ call, alerts }: { call: CallRecord | undefined; 
       <Card className="call-hero">
         <div className="hero-row">
           <div className="big num">
-            {call.durationSec}
+            {call.durationSec ?? 0}
             <small style={{ marginLeft: 2 }}>s</small>
             <span className="name">
-              {person.name} · {reminder.text}
+              {call.personName} · {call.text}
             </span>
           </div>
           <span className="good-txt" style={confirmed ? undefined : { color: "var(--bad)" }}>
@@ -82,15 +80,15 @@ export function LastCallPanel({ call, alerts }: { call: CallRecord | undefined; 
               <li key={l.at} className={`line ${l.role === "agent" ? "agent" : "parent"}`}>
                 <span className="sq" aria-hidden="true" />
                 <div>
-                  <span className="sr-only">{l.role === "agent" ? "Agent:" : `${person.name}:`}</span>
-                  <div className="te" lang={person.lang.split("-")[0]}>
+                  <span className="sr-only">{l.role === "agent" ? "Agent:" : `${call.personName}:`}</span>
+                  <div className="te" lang={call.lang.split("-")[0]}>
                     {l.native}
                   </div>
                   <div className="en">{l.english}</div>
                 </div>
                 <span className="end">
                   {voice && l.role === "agent" ? (
-                    <SpeakButton text={l.native} languageCode={person.lang} speaker={voice.id} label={`agent line at ${l.at}`} />
+                    <SpeakButton text={l.native} languageCode={call.lang} speaker={voice.id} label={`agent line at ${l.at}`} />
                   ) : null}
                   <MonoLabel as="span" className="ts">
                     {l.at}
@@ -100,7 +98,7 @@ export function LastCallPanel({ call, alerts }: { call: CallRecord | undefined; 
             ))}
           </ol>
         ) : (
-          <EmptyState small title="No answer" description={`${person.name} did not pick up on either attempt.`} />
+          <EmptyState small title="No answer" description={`${call.personName} did not pick up on either attempt.`} />
         )}
       </Card>
 

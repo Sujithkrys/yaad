@@ -495,3 +495,7 @@ dialog.drawer .dlg { width: min(460px, 100vw); height: 100vh; max-height: 100vh;
   .two, .meta-grid { grid-template-columns: minmax(0, 1fr); }
   .set-row { flex-wrap: wrap; }
 }
+
+/* skeletons */
+.skel { background: var(--card-hover); border-radius: 8px; animation: skel 1.4s ease-in-out infinite; }
+@keyframes skel { 50% { opacity: .55; } }

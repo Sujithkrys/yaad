@@ -2,11 +2,10 @@
 
 import { useLayoutEffect, useRef, useState, type FocusEvent, type MouseEvent } from "react";
 import { Card, MonoLabel, SegmentedControl, cx } from "@/components/ui";
-import type { AdherenceRow } from "@/lib/app/calls";
-import { fmtDate, fmtShortDate } from "@/lib/app/time";
-import type { DayResult, ReminderKind } from "@/lib/app/types";
+import { fmtDayKey, fmtShortDayKey } from "@/lib/time";
+import type { AdherenceRow, DayResult, ReminderKind } from "@/lib/types";
 
-const KIND_OPTIONS: { value: ReminderKind; label: string }[] = [
+const KIND_OPTIONS: { value: Exclude<ReminderKind, "other">; label: string }[] = [
   { value: "tablet", label: "Tablet" },
   { value: "walk", label: "Walk" },
   { value: "visit", label: "Visit" },
@@ -32,16 +31,16 @@ type Tip = { title: string; body: string; cell: HTMLElement } | null;
 
 type AdherenceGridProps = {
   rows: AdherenceRow[];
-  dayStarts: number[];
-  kind: ReminderKind;
+  days: string[];
+  kind: Exclude<ReminderKind, "other">;
   missed: number;
   alerts: boolean;
-  onKindChange: (k: ReminderKind) => void;
+  onKindChange: (k: Exclude<ReminderKind, "other">) => void;
 };
 
-export function AdherenceGrid({ rows, dayStarts, kind, missed, alerts, onKindChange }: AdherenceGridProps) {
-  const days = dayStarts.length;
-  const axis = [dayStarts[0], dayStarts[Math.floor(days / 2)], dayStarts[days - 1]];
+export function AdherenceGrid({ rows, days: dayKeys, kind, missed, alerts, onKindChange }: AdherenceGridProps) {
+  const days = dayKeys.length;
+  const axis = [dayKeys[0], dayKeys[Math.floor(days / 2)], dayKeys[days - 1]];
   const cardRef = useRef<HTMLDivElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const [tip, setTip] = useState<Tip>(null);
@@ -50,7 +49,7 @@ export function AdherenceGrid({ rows, dayStarts, kind, missed, alerts, onKindCha
     const person = cell.dataset.p ?? "";
     const day = Number(cell.dataset.d);
     const v = Number(cell.dataset.v) as DayResult;
-    setTip({ title: `${person} · ${fmtDate(dayStarts[day])}`, body: tipText(v, alerts), cell });
+    setTip({ title: `${person} · ${fmtDayKey(dayKeys[day])}`, body: tipText(v, alerts), cell });
   }
 
   // Position after the content renders so the measured size is correct.
@@ -88,19 +87,19 @@ export function AdherenceGrid({ rows, dayStarts, kind, missed, alerts, onKindCha
       </div>
 
       <div className="hm">
-        {rows.map(({ person: p, cells, pct }) => (
-          <div className="hm-row" key={p.id}>
-            <span className="hm-name">{p.name}</span>
+        {rows.map(({ personId, name, cells, pct }) => (
+          <div className="hm-row" key={personId}>
+            <span className="hm-name">{name}</span>
             <div className="hm-cells">
               {cells.map((v, d) => (
                 <button
                   key={d}
                   type="button"
                   className={cx("cell", cellClass(v), d === days - 1 && "today")}
-                  data-p={p.name}
+                  data-p={name}
                   data-d={d}
                   data-v={v}
-                  aria-label={`${p.name}, ${fmtDate(dayStarts[d])}, ${cellLabel(v)}`}
+                  aria-label={`${name}, ${fmtDayKey(dayKeys[d])}, ${cellLabel(v)}`}
                 />
               ))}
             </div>
@@ -113,8 +112,8 @@ export function AdherenceGrid({ rows, dayStarts, kind, missed, alerts, onKindCha
       <div className="hm-axis mono" aria-hidden="true">
         <span />
         <div>
-          {axis.map((ts) => (
-            <span key={ts}>{fmtShortDate(ts)}</span>
+          {axis.map((d) => (
+            <span key={d}>{fmtShortDayKey(d)}</span>
           ))}
         </div>
         <span />

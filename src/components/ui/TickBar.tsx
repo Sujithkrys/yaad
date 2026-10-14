@@ -1,4 +1,4 @@
-import type { CallStatus } from "@/lib/app/types";
+import type { CallStatus } from "@/lib/types";
 import { cx } from "./cx";
 
 export type Tick = {
