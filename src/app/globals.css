@@ -304,9 +304,10 @@ button, select { font: inherit; color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .line .end { display: inline-flex; align-items: center; gap: 8px; }
 
-/* ---------- Voice studio ---------- */
+/* ---------- Voice preview ---------- */
 .studio { max-width: 640px; margin-inline: auto; }
 .studio-form { padding: 16px; display: grid; gap: 16px; }
+.studio-note { margin: 10px 4px 0; color: var(--ink-3); font-size: 12px; }
 .field-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .field-row .field { flex: 1 1 180px; }
 .field .hint { color: var(--ink-3); font-size: 12px; }

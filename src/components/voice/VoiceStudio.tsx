@@ -15,6 +15,7 @@ import {
   SpinnerIcon,
   StopIcon,
 } from "@/components/ui";
+import { useFamily, useReminders } from "@/lib/client/hooks";
 import { renderGreeting } from "@/lib/greetings";
 import { LANGUAGES, NO_VOICE_HINT, voicesFor, type LanguageCode } from "@/lib/voices";
 import { SPEECH_ERROR, useSpeech } from "./useSpeech";
@@ -24,28 +25,52 @@ const REMINDER = "BP tablet";
 const MAX_TEXT = 300;
 const DEFAULT_LANG: LanguageCode = LANGUAGES.find((l) => voicesFor(l.code).length)?.code ?? "hi-IN";
 
-const LANGUAGE_OPTIONS = LANGUAGES.map((l) => {
-  const empty = voicesFor(l.code).length === 0;
-  return { value: l.code, label: empty ? `${l.label} · ${NO_VOICE_HINT}` : l.label, disabled: empty };
-});
+// Languages without a voice stay selectable so the text can still be read; only Play waits.
+const LANGUAGE_OPTIONS = LANGUAGES.map((l) => ({
+  value: l.code,
+  label: voicesFor(l.code).length ? l.label : `${l.label} · ${NO_VOICE_HINT.toLowerCase()}`,
+}));
 
 export function VoiceStudio() {
   const [lang, setLang] = useState<LanguageCode>(DEFAULT_LANG);
   const [speaker, setSpeaker] = useState(voicesFor(DEFAULT_LANG)[0]?.id ?? "");
   const [pace, setPace] = useState(1);
   const [text, setText] = useState(renderGreeting(DEFAULT_LANG, NAME, REMINDER));
+  const [reminderId, setReminderId] = useState("");
   const { state, message, play, stop } = useSpeech();
+  const reminders = useReminders().data;
+  const family = useFamily().data;
 
   const voices = voicesFor(lang);
-  const missing = LANGUAGES.filter((l) => voicesFor(l.code).length === 0).map((l) => l.label);
+  const langLabel = LANGUAGES.find((l) => l.code === lang)?.label ?? lang;
+  const people = new Map((family ?? []).map((p) => [p.id, p]));
+  const reminderOptions = (reminders ?? []).flatMap((r) => {
+    const person = people.get(r.personId);
+    return person ? [{ value: r.id, label: `${person.name} · ${r.text}` }] : [];
+  });
   const canPlay = Boolean(speaker) && text.trim().length > 0 && text.length <= MAX_TEXT;
+
+  function switchLanguage(next: LanguageCode) {
+    setLang(next);
+    setSpeaker(voicesFor(next)[0]?.id ?? "");
+    stop();
+  }
 
   function changeLanguage(code: string) {
     const next = code as LanguageCode;
-    setLang(next);
-    setSpeaker(voicesFor(next)[0]?.id ?? "");
+    switchLanguage(next);
+    setReminderId("");
     setText(renderGreeting(next, NAME, REMINDER));
-    stop();
+  }
+
+  function pickReminder(id: string) {
+    setReminderId(id);
+    const reminder = reminders?.find((r) => r.id === id);
+    const person = reminder && people.get(reminder.personId);
+    if (!reminder || !person) return;
+    const next = reminder.lang ?? person.lang;
+    switchLanguage(next);
+    setText(renderGreeting(next, person.name, reminder.text).slice(0, MAX_TEXT));
   }
 
   function onPlay() {
@@ -58,7 +83,7 @@ export function VoiceStudio() {
       <Panel aria-labelledby="studio-title">
         <PanelHead>
           <PanelTitle id="studio-title" info="Preview how the agent will sound when it calls. Previews are cached, so replays are free.">
-            Voice studio
+            Voice preview
           </PanelTitle>
           <span className="model-chip">
             <SparkleIcon />
@@ -114,6 +139,20 @@ export function VoiceStudio() {
           </div>
 
           <div className="field">
+            <label className="mono" htmlFor="studio-reminder">
+              Use a reminder
+            </label>
+            <ChipSelect
+              id="studio-reminder"
+              label="Use a reminder"
+              value={reminderId}
+              disabled={reminderOptions.length === 0}
+              options={[{ value: "", label: reminderOptions.length ? "Choose a reminder" : "No reminders yet" }, ...reminderOptions]}
+              onChange={pickReminder}
+            />
+          </div>
+
+          <div className="field">
             <label className="mono" htmlFor="studio-text">
               What the agent says
             </label>
@@ -127,7 +166,7 @@ export function VoiceStudio() {
             />
             <span className="hint num">
               {text.length} / {MAX_TEXT} characters
-              {missing.length ? ` · ${missing.join(", ")}: ${NO_VOICE_HINT.toLowerCase()}` : ""}
+              {voices.length ? "" : ` · ${langLabel}: ${NO_VOICE_HINT.toLowerCase()}, so Play is off for now`}
             </span>
           </div>
         </Card>
@@ -142,6 +181,7 @@ export function VoiceStudio() {
           </Button>
         </PanelFoot>
       </Panel>
+      <p className="studio-note">A preview of the reminder voice, powered by Bulbul V4 Flash. Calls use the same Bulbul voices.</p>
     </div>
   );
 }

@@ -14,13 +14,14 @@ export type LanguageCode = (typeof LANGUAGES)[number]["code"];
 
 export type Voice = { id: string; label: string };
 
-export const VOICES: Record<LanguageCode, Voice[]> = {
+/**
+ * The one place to edit voices. Add a speaker as { id: "<name>_<lang>_<style>", label: "<Name>" }.
+ * A language with no speakers stays selectable; the preview just can't play it yet.
+ */
+export const languageVoices: Record<LanguageCode, Voice[]> = {
   "hi-IN": [{ id: "ritu_hi_customer", label: "Ritu" }],
-  // TODO: add Telugu speaker IDs from Sarvam's voice catalog.
   "te-IN": [],
-  // TODO: add Tamil speaker IDs from Sarvam's voice catalog.
   "ta-IN": [],
-  // TODO: add Kannada speaker IDs from Sarvam's voice catalog.
   "kn-IN": [],
   "en-IN": [{ id: "simran_en_customer", label: "Simran" }],
 };
@@ -34,7 +35,7 @@ export function isLanguageCode(code: string): code is LanguageCode {
 }
 
 export function voicesFor(code: string): Voice[] {
-  return isLanguageCode(code) ? VOICES[code] : [];
+  return isLanguageCode(code) ? languageVoices[code] : [];
 }
 
 export function isKnownSpeaker(code: string, speaker: string) {

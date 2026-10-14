@@ -13,6 +13,10 @@ export type SpeechRequest = {
 
 export const SPEECH_ERROR = "Couldn't play this voice. Try again.";
 
+// A plain sentence from /api/tts that is safe to show. Anything else (network
+// failures, browser playback errors) is replaced with SPEECH_ERROR.
+class SpeechError extends Error {}
+
 // Only one clip plays at a time across the whole app.
 let current: { audio: HTMLAudioElement; stop: () => void } | null = null;
 
@@ -29,8 +33,8 @@ async function fetchAudioUrl(req: SpeechRequest) {
     body: JSON.stringify({ ...req, pace: req.pace ?? 1 }),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? SPEECH_ERROR);
+    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    throw new SpeechError(typeof body?.error === "string" && body.error ? body.error : SPEECH_ERROR);
   }
   const url = URL.createObjectURL(await res.blob());
   urls.set(key, url);
@@ -75,7 +79,7 @@ export function useSpeech() {
       } catch (err) {
         if (id !== runId.current) return;
         console.warn("[speech]", (err as Error).message);
-        setMessage((err as Error).message || SPEECH_ERROR);
+        setMessage(err instanceof SpeechError ? err.message : SPEECH_ERROR);
         setState("error");
       }
     },

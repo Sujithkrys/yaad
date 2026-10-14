@@ -12,7 +12,7 @@ const NAV: NavItem[] = [
   { href: "/reminders", label: "Reminders", Icon: ClockIcon },
   { href: "/family", label: "Family", Icon: FamilyIcon },
   { href: "/history", label: "Call history", Icon: PhoneIcon },
-  { href: "/studio", label: "Voice studio", Icon: WaveIcon },
+  { href: "/studio", label: "Voice preview", Icon: WaveIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 

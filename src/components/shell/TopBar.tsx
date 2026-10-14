@@ -51,7 +51,7 @@ export function TopBar() {
   } else if (path.startsWith("/settings")) {
     head = { title: "Settings", sub: "Calls, quiet hours and alerts" };
   } else if (path.startsWith("/studio")) {
-    head = { title: "Voice studio", sub: "Hear the agent before it calls" };
+    head = { title: "Voice preview", sub: "Hear the reminder before it calls" };
   } else {
     const items = dash?.todayItems ?? [];
     const retries = items.filter((c) => c.status === "retry").length;

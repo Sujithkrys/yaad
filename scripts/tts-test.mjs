@@ -2,7 +2,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const { VOICES } = await import("../src/lib/voices.ts");
+const { languageVoices } = await import("../src/lib/voices.ts");
 
 const key = process.env.SARVAM_API_KEY;
 if (!key) {
@@ -10,7 +10,7 @@ if (!key) {
   process.exit(1);
 }
 
-const speaker = VOICES["hi-IN"][0]?.id;
+const speaker = languageVoices["hi-IN"][0]?.id;
 if (!speaker) {
   console.error("No Hindi voice is configured in src/lib/voices.ts.");
   process.exit(1);
