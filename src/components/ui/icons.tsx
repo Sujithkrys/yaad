@@ -168,3 +168,44 @@ export function WaveIcon(p: IconProps) {
     </svg>
   );
 }
+
+export function CloseIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.6)}>
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+    </svg>
+  );
+}
+
+export function EditIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.3)}>
+      <path d="M10.5 2.8l2.7 2.7L6 12.7l-3.2.5.5-3.2z" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.3)}>
+      <path d="M2.8 4.3h10.4M6.3 4.3V2.8h3.4v1.5M4.2 4.3l.6 8.9h6.4l.6-8.9" />
+    </svg>
+  );
+}
+
+export function ExitIcon({ size = 15, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.4)}>
+      <path d="M6 3H3.5v10H6M10 5l3 3-3 3M13 8H6" />
+    </svg>
+  );
+}
+
+export function SearchIcon({ size = 14, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.3)}>
+      <circle cx="7" cy="7" r="4.3" />
+      <path d="M10.2 10.2l3.3 3.3" />
+    </svg>
+  );
+}

@@ -6,7 +6,7 @@ const PAD = 4;
 export function Sparkline({ values }: { values: number[] }) {
   const pts = values.map((v, i) => [
     (i / (values.length - 1)) * (W - 8) + 2,
-    H - PAD - ((v - 0.4) / 0.6) * (H - 2 * PAD - 2),
+    H - PAD - ((Math.max(0.4, v) - 0.4) / 0.6) * (H - 2 * PAD - 2),
   ]);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   const first = pts[0];

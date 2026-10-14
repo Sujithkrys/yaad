@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Button,
   CallNowIcon,
@@ -16,66 +16,54 @@ import {
   TickBar,
   type Tick,
 } from "@/components/ui";
-import { formatTime } from "@/lib/format";
-import { calls as sampleCalls, INITIAL_SELECTED_CALL, people, RETRY_AFTER_MIN, type Call } from "@/lib/sample-data";
+import { callNow } from "@/lib/app/store";
+import type { CallRecord } from "@/lib/app/types";
 import { CallRow } from "./CallRow";
 
 const SLOTS = 32; // half-hour slots from 6 AM to 10 PM
-const FILTER_OPTIONS = [{ value: "all", label: "All family" }, ...people.map((p) => ({ value: p.name, label: p.name }))];
 
-function slotOf(c: Call) {
-  return (c.h - 6) * 2 + (c.m >= 30 ? 1 : 0);
+function slotOf(c: CallRecord) {
+  const d = new Date(c.scheduledTs);
+  return (d.getHours() - 6) * 2 + (d.getMinutes() >= 30 ? 1 : 0);
 }
 
-export function TodaysCallsPanel() {
-  const [calls, setCalls] = useState<Call[]>(sampleCalls);
-  const [selected, setSelected] = useState(INITIAL_SELECTED_CALL);
+function defaultSelection(calls: CallRecord[]) {
+  const order = ["calling", "retry", "scheduled", "missed", "confirmed"] as const;
+  for (const s of order) {
+    const hit = calls.find((c) => c.status === s);
+    if (hit) return hit.id;
+  }
+  return null;
+}
+
+export function TodaysCallsPanel({ calls, retryMin }: { calls: CallRecord[]; retryMin: number }) {
+  const [picked, setPicked] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const finishCall = useCallback((id: number) => {
-    setCalls((prev) =>
-      prev.map((c) => (c.id === id && c.status === "calling" ? { ...c, status: "confirmed", note: formatTime(19, 3) } : c)),
-    );
-  }, []);
-
-  useEffect(() => {
-    const list = timers.current;
-    list.push(setTimeout(() => finishCall(INITIAL_SELECTED_CALL), 9000));
-    return () => list.forEach(clearTimeout);
-  }, [finishCall]);
-
-  const visible = calls.filter((c) => filter === "all" || c.who === filter);
-  const confirmed = calls.filter((c) => c.status === "confirmed").length;
+  const visible = calls.filter((c) => filter === "all" || c.person.name === filter);
+  const selected = picked && visible.some((c) => c.id === picked) ? picked : defaultSelection(visible);
   const sel = calls.find((c) => c.id === selected);
+  const confirmed = calls.filter((c) => c.status === "confirmed").length;
+  const names = [...new Set(calls.map((c) => c.person.name))];
+  const options = [{ value: "all", label: "All family" }, ...names.map((n) => ({ value: n, label: n }))];
 
   const ticks: Tick[] = Array.from({ length: SLOTS }, (_, i) => {
-    const hit = calls.find((c) => slotOf(c) === i);
+    const hits = calls.filter((c) => slotOf(c) === i);
+    const hit = hits.find((c) => filter === "all" || c.person.name === filter) ?? hits[0];
     if (!hit) return {};
-    const shown = filter === "all" || hit.who === filter;
+    const shown = filter === "all" || hit.person.name === filter;
     return { status: hit.status, filled: true, selected: shown && hit.id === selected, dim: !shown };
   });
 
-  function onFilter(value: string) {
-    setFilter(value);
-    const first = calls.find((c) => value === "all" || c.who === value);
-    setSelected(first ? first.id : 0);
-  }
-
-  function callNow() {
-    if (!sel || sel.status === "confirmed" || sel.status === "calling") return;
-    setCalls((prev) => prev.map((c) => (c.id === sel.id ? { ...c, status: "calling", note: "ringing" } : c)));
-    timers.current.push(setTimeout(() => finishCall(sel.id), 3500));
-  }
-
+  const busy = !sel || sel.status === "confirmed" || sel.status === "calling";
   let cta: React.ReactNode = "Pick a call";
   if (sel?.status === "confirmed") cta = "Confirmed";
-  else if (sel?.status === "calling") cta = `Calling ${sel.who}…`;
+  else if (sel?.status === "calling") cta = `Calling ${sel.person.name}…`;
   else if (sel)
     cta = (
       <>
         <CallNowIcon />
-        Call {sel.who} now
+        Call {sel.person.name} now
       </>
     );
 
@@ -84,11 +72,11 @@ export function TodaysCallsPanel() {
       <PanelHead>
         <PanelTitle
           id="a-title"
-          info="Each reminder places one phone call. If nobody answers, the agent retries after 10 minutes."
+          info={`Each reminder places one phone call. If nobody answers, the agent retries after ${retryMin} minutes.`}
         >
           Today&apos;s calls
         </PanelTitle>
-        <ChipSelect label="Show calls for" value={filter} options={FILTER_OPTIONS} onChange={onFilter} icon={<PersonIcon />} />
+        <ChipSelect label="Show calls for" value={filter} options={options} onChange={setFilter} icon={<PersonIcon />} />
       </PanelHead>
 
       <Card className="hero">
@@ -99,7 +87,7 @@ export function TodaysCallsPanel() {
             <small>/ {calls.length}</small>
           </div>
           <MonoLabel style={{ textAlign: "right" }}>
-            Retry after <b>{RETRY_AFTER_MIN} min</b>
+            Retry after <b>{retryMin} min</b>
           </MonoLabel>
         </div>
         <TickBar ticks={ticks} />
@@ -113,9 +101,9 @@ export function TodaysCallsPanel() {
 
       <Card className="rows fill">
         {visible.length ? (
-          visible.map((c) => <CallRow key={c.id} call={c} selected={c.id === selected} onSelect={setSelected} />)
+          visible.map((c) => <CallRow key={c.id} call={c} selected={c.id === selected} onSelect={setPicked} />)
         ) : (
-          <p className="empty-rows">No calls today for this person.</p>
+          <p className="empty-rows">{calls.length ? "No calls today for this person." : "No calls planned for today."}</p>
         )}
       </Card>
 
@@ -129,7 +117,7 @@ export function TodaysCallsPanel() {
             <span>Live · {calls.length} calls</span>
           </MonoLabel>
         </div>
-        <Button onClick={callNow} disabled={!sel || sel.status === "confirmed" || sel.status === "calling"}>
+        <Button onClick={() => sel && !busy && callNow(sel.id)} disabled={busy}>
           {cta}
         </Button>
       </PanelFoot>

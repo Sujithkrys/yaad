@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Telugu } from "next/font/google";
+import { ToastProvider } from "@/components/shell/Toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +25,7 @@ const notoSansTelugu = Noto_Sans_Telugu({
 });
 
 export const metadata: Metadata = {
-  title: "Yaad",
+  title: { default: "Yaad", template: "%s · Yaad" },
   description: "Phone-call reminders for your parents, in their own language.",
   icons: { icon: "/logo/Orange%20Calling%20Y%20Icon.png" },
 };
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${notoSansTelugu.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

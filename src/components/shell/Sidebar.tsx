@@ -1,46 +1,51 @@
+"use client";
+
 import Link from "next/link";
-import { Card, MonoLabel, StatBar } from "@/components/ui";
-import { usage, user } from "@/lib/sample-data";
+import { Card, ExitIcon, MonoLabel, StatBar } from "@/components/ui";
+import { usageMinutes } from "@/lib/app/calls";
+import { useAppState, useNow } from "@/lib/app/store";
+import { Brand } from "./Brand";
 import { SidebarNav } from "./SidebarNav";
 
-const LOGO_SRC = "/logo/Orange%20Calling%20Y%20Icon.png";
+const MINUTES_LIMIT = 300;
+const SEGMENTS = 16;
 
 export function Sidebar() {
-  const segments = 16;
-  const on = Math.round((usage.used / usage.limit) * segments);
+  const state = useAppState();
+  const now = useNow(60_000);
+  const used = state ? usageMinutes(state, now) : 0;
+  const name = state?.user.name ?? "";
+
   return (
     <aside className="side" aria-label="Main">
-      <Link href="/dashboard" className="brand" aria-label="Yaad, go to dashboard">
-        <span className="logo" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO_SRC} alt="" width={28} height={28} />
-        </span>
-        <span className="brand-name">Yaad</span>
-      </Link>
+      <Brand href="/dashboard" />
 
-      <SidebarNav />
+      <SidebarNav
+        counts={state ? { "/reminders": state.reminders.filter((r) => r.active).length, "/family": state.family.length } : {}}
+      />
 
       <div className="side-spacer" />
 
       <Card className="usage">
         <MonoLabel>Call minutes this month</MonoLabel>
         <div className="big num">
-          {usage.used}
-          <small>/ {usage.limit} min</small>
+          {used}
+          <small>/ {MINUTES_LIMIT} min</small>
         </div>
-        <StatBar on={on} segments={segments} />
+        <StatBar on={Math.min(SEGMENTS, Math.round((used / MINUTES_LIMIT) * SEGMENTS))} segments={SEGMENTS} />
       </Card>
 
       <div className="me">
         <span className="avatar" aria-hidden="true">
-          {user.initial}
+          {name.charAt(0) || "·"}
         </span>
         <div className="nm">
-          {user.name}
-          <span>
-            {user.role} · {user.familyCount} family
-          </span>
+          {name}
+          <span>Owner · {state?.family.length ?? 0} family</span>
         </div>
+        <Link className="icon-btn" href="/" aria-label="Back to site" title="Back to site" style={{ marginLeft: "auto" }}>
+          <ExitIcon />
+        </Link>
       </div>
     </aside>
   );

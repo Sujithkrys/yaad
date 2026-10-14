@@ -1,16 +1,8 @@
 import type { Metadata } from "next";
-import { AdherencePanel } from "@/components/dashboard/AdherencePanel";
-import { LastCallPanel } from "@/components/dashboard/LastCallPanel";
-import { TodaysCallsPanel } from "@/components/dashboard/TodaysCallsPanel";
+import { DashboardView } from "@/components/dashboard/DashboardView";
 
-export const metadata: Metadata = { title: "Dashboard · Yaad" };
+export const metadata: Metadata = { title: "Dashboard" };
 
-export default function DashboardPage() {
-  return (
-    <div className="panels">
-      <TodaysCallsPanel />
-      <AdherencePanel />
-      <LastCallPanel />
-    </div>
-  );
+export default function Page() {
+  return <DashboardView />;
 }

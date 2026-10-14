@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
+import { DialogsProvider } from "@/components/app/DialogsProvider";
 import { Sidebar } from "@/components/shell/Sidebar";
-import { ToastProvider } from "@/components/shell/Toast";
 import { TopBar } from "@/components/shell/TopBar";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <ToastProvider>
+    <DialogsProvider>
       <div className="app">
         <Sidebar />
         <div className="content">
@@ -13,6 +13,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <main className="canvas">{children}</main>
         </div>
       </div>
-    </ToastProvider>
+    </DialogsProvider>
   );
 }

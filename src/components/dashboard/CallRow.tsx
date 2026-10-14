@@ -1,17 +1,17 @@
 import { MonoLabel, Pill } from "@/components/ui";
-import { formatTime } from "@/lib/format";
-import type { Call } from "@/lib/sample-data";
+import { fmtTs } from "@/lib/app/time";
+import type { CallRecord } from "@/lib/app/types";
 
-type CallRowProps = { call: Call; selected: boolean; onSelect: (id: number) => void };
+type CallRowProps = { call: CallRecord; selected: boolean; onSelect: (id: string) => void };
 
 export function CallRow({ call, selected, onSelect }: CallRowProps) {
-  const meta = `${call.what} · ${formatTime(call.h, call.m)}`;
+  const meta = `${call.reminder.text} · ${fmtTs(call.scheduledTs)}`;
   return (
     <button className="row" type="button" data-s={call.status} aria-pressed={selected} onClick={() => onSelect(call.id)}>
       <span className="rd" aria-hidden="true" />
       <span style={{ minWidth: 0 }}>
         <span className="who" style={{ display: "block" }}>
-          {call.who}
+          {call.person.name}
         </span>
         <MonoLabel as="span" className="meta" style={{ display: "block" }} title={meta}>
           {meta}

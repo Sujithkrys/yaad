@@ -1,17 +1,8 @@
 import type { Metadata } from "next";
-import { EmptyState } from "@/components/shell/EmptyState";
-import { NewReminderButton } from "@/components/shell/NewReminderButton";
-import { ClockIcon } from "@/components/ui";
+import { RemindersView } from "@/components/reminders/RemindersView";
 
-export const metadata: Metadata = { title: "Reminders · Yaad" };
+export const metadata: Metadata = { title: "Reminders" };
 
-export default function RemindersPage() {
-  return (
-    <EmptyState
-      icon={<ClockIcon />}
-      title="No reminders yet"
-      description="Schedule a call, like a 7 PM BP tablet for Amma, and Yaad will ring at that time every day."
-      action={<NewReminderButton label="Create a reminder" />}
-    />
-  );
+export default function Page() {
+  return <RemindersView />;
 }
