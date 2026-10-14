@@ -55,14 +55,29 @@ export const LIVE_KEYS = [
 
 let cached: Env | null = null;
 
+/** Thrown when settings fail validation. Carries variable names only, never values. */
+export class EnvError extends Error {
+  constructor(readonly keys: string[]) {
+    super(`Invalid call configuration: ${keys.join(", ")}`);
+  }
+}
+
+// Values pasted into a hosting dashboard often carry a trailing newline or
+// wrapping quotes; strip both. Blank values mean "not set".
+function clean(v: string | undefined) {
+  if (v === undefined) return undefined;
+  const t = v.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+  return t === "" ? undefined : t;
+}
+
 export function env(): Env {
   if (cached) return cached;
-  // Blank values in .env files mean "not set".
-  const raw = Object.fromEntries(Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]));
+  const raw = Object.fromEntries(Object.entries(process.env).map(([k, v]) => [k, clean(v)]));
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    const names = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
-    throw new Error(`Invalid call configuration: ${names}`);
+    const keys = [...new Set(parsed.error.issues.map((i) => i.path.join(".")))];
+    console.error("[env]", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    throw new EnvError(keys);
   }
   cached = parsed.data;
   return cached;
