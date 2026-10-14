@@ -1,12 +1,21 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { CloseIcon, Modal, MonoLabel, Pill } from "@/components/ui";
+import { useState, type ReactNode } from "react";
+import { useToast } from "@/components/shell/Toast";
+import { api } from "@/lib/client/api";
+import { Button, CallNowIcon, CloseIcon, Modal, MonoLabel, Pill } from "@/components/ui";
 import { useSettings } from "@/lib/client/hooks";
 import { fmtDate, fmtDuration, fmtTs } from "@/lib/time";
 import type { Call, Response } from "@/lib/types";
 import { LANGUAGES, voicesFor } from "@/lib/voices";
 import { Transcript } from "./Transcript";
+
+const FAILURE_TEXT: Record<string, string> = {
+  not_allowlisted: "The number is not on the call allowlist.",
+  bad_phone: "The mobile number could not be dialled.",
+  no_answer: "Nobody answered.",
+  busy: "The line was busy.",
+};
 
 const RESPONSE_TEXT: Record<Response, string> = {
   taken: "Said they had done it",
@@ -26,6 +35,20 @@ export function CallDrawer({ call, onClose }: { call: Call | null; onClose: () =
 
 function CallDetails({ call, onClose }: { call: Call; onClose: () => void }) {
   const settings = useSettings().data;
+  const say = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function callAgain() {
+    setBusy(true);
+    try {
+      const r = await api.callAgain(call.id);
+      say(r.message);
+      onClose();
+    } catch (e) {
+      say((e as Error).message);
+      setBusy(false);
+    }
+  }
   const langLabel = LANGUAGES.find((l) => l.code === call.lang)?.label ?? call.lang;
   const voice = voicesFor(call.lang)[0];
   const retryMin = settings?.retryMin ?? 10;
@@ -55,6 +78,15 @@ function CallDetails({ call, onClose }: { call: Call; onClose: () => void }) {
         {call.status === "missed" ? (
           <p className="err">{call.alerted ? "Missed. Family was alerted." : "Missed. No alert was sent."}</p>
         ) : null}
+        {call.failureReason ? (
+          <p className="warn">{FAILURE_TEXT[call.failureReason] ?? `The call did not go through (${call.failureReason.replace(/_/g, " ")}).`}</p>
+        ) : null}
+        {call.responseNote ? (
+          <div className="field">
+            <span className="lbl">Summary from the agent</span>
+            <p style={{ margin: 0 }}>{call.responseNote}</p>
+          </div>
+        ) : null}
         {call.manual ? <MonoLabel>Placed by hand with call now</MonoLabel> : null}
 
         <div className="field">
@@ -78,6 +110,15 @@ function CallDetails({ call, onClose }: { call: Call; onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {call.status !== "calling" ? (
+        <div className="dlg-foot">
+          <Button onClick={callAgain} disabled={busy}>
+            <CallNowIcon />
+            {busy ? "Calling…" : `Call ${call.personName} again`}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

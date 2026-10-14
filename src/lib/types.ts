@@ -61,6 +61,11 @@ export type Call = {
   alerted: boolean;
   manual: boolean;
   doneAt: number | null;
+  /** epoch ms of the next scheduled attempt, for retries */
+  nextAttemptAt: number | null;
+  failureReason: string | null;
+  /** call_summary from the agent */
+  responseNote: string | null;
 };
 
 export type Settings = {

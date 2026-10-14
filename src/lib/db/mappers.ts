@@ -45,6 +45,9 @@ export type CallRow = {
   alerted: boolean;
   manual: boolean;
   done_at: string | null;
+  next_attempt_at?: string | null;
+  failure_reason?: string | null;
+  response_note?: string | null;
   people?: { name: string } | null;
 };
 
@@ -103,6 +106,9 @@ export const toCall = (r: CallRow): Call => ({
   alerted: r.alerted,
   manual: r.manual,
   doneAt: r.done_at ? new Date(r.done_at).getTime() : null,
+  nextAttemptAt: r.next_attempt_at ? new Date(r.next_attempt_at).getTime() : null,
+  failureReason: r.failure_reason ?? null,
+  responseNote: r.response_note ?? null,
 });
 
 export const toSettings = (r: SettingsRow): Settings => ({

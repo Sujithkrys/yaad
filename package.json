@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "tts:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/tts-test.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "call:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/call-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

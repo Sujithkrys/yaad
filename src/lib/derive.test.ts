@@ -45,6 +45,9 @@ const call = (over: Partial<Call>): Call => ({
   alerted: false,
   manual: false,
   doneAt: null,
+  nextAttemptAt: null,
+  failureReason: null,
+  responseNote: null,
   ...over,
 });
 

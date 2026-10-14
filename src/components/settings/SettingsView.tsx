@@ -4,9 +4,11 @@ import { useState, type ReactNode } from "react";
 import { Loading } from "@/components/app/Loading";
 import { LoadError } from "@/components/dashboard/DashboardView";
 import { useToast } from "@/components/shell/Toast";
-import { Button, Card, Toggle } from "@/components/ui";
+import { Button, Card, Pill, Toggle } from "@/components/ui";
 import { api } from "@/lib/client/api";
-import { setOwnerName, useFamily, useOwnerName, useSettings } from "@/lib/client/hooks";
+import useSWR, { mutate } from "swr";
+import { fetcher } from "@/lib/client/api";
+import { useFamily, useOwnerName, useSettings } from "@/lib/client/hooks";
 import type { Settings } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
 
@@ -27,6 +29,7 @@ export function SettingsView() {
   const family = useFamily();
   const owner = useOwnerName();
   const say = useToast();
+  const health = useSWR<{ mode: string; ready: boolean; allowlist: number }>("/api/health/sarvam", fetcher).data;
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -61,6 +64,24 @@ export function SettingsView() {
     <div className="view-stack" style={{ maxWidth: 720 }}>
       <h2 className="set-title">Calls</h2>
       <Card className="set-card">
+        <Row
+          title="Phone calls"
+          desc={
+            !health
+              ? "Checking the Sarvam connection."
+              : health.mode === "live"
+                ? health.ready
+                  ? `Real calls through Sarvam. Only ${health.allowlist} allowlisted number${health.allowlist === 1 ? "" : "s"} can be called.`
+                  : "Live mode is on, but some Sarvam settings are missing on the server."
+                : "Simulated: no real phone rings. Results arrive after a few seconds so you can try the app."
+          }
+        >
+          {health ? (
+            <Pill variant={health.mode === "live" ? (health.ready ? "confirmed" : "missed") : "scheduled"}>
+              {health.mode === "live" ? "Live" : "Simulated"}
+            </Pill>
+          ) : null}
+        </Row>
         <Row title="Retry after" desc="If nobody answers, or they say later, the agent calls again after this long.">
           <select className="input" aria-label="Retry after" value={s.retryMin} onChange={(e) => save({ retryMin: Number(e.target.value) as Settings["retryMin"] })}>
             {[5, 10, 15].map((m) => (
@@ -70,6 +91,15 @@ export function SettingsView() {
             ))}
           </select>
         </Row>
+        {health?.mode === "simulate" ? (
+          <Row title="Demo call outcome" desc="How simulated calls answer while real calling is off.">
+            <select className="input" aria-label="Demo call outcome" value={s.demoOutcome} onChange={(e) => save({ demoOutcome: e.target.value as Settings["demoOutcome"] })}>
+              <option value="random">Random</option>
+              <option value="taken">Always taken</option>
+              <option value="noanswer">Never answers</option>
+            </select>
+          </Row>
+        ) : null}
         <Row title="Calls per reminder" desc="The first call plus retries before it counts as missed.">
           <select className="input" aria-label="Calls per reminder" value={s.maxAttempts} onChange={(e) => save({ maxAttempts: Number(e.target.value) })}>
             {[1, 2, 3].map((n) => (
@@ -149,19 +179,29 @@ export function SettingsView() {
 
       <h2 className="set-title">Account</h2>
       <Card className="set-card">
-        <Row title="Your name" desc="Used in the greeting on this device.">
+        <Row title="Your name" desc="Names your space and tells your family who set the reminder. Each name can be used once.">
           <input
             className="input"
             aria-label="Your name"
             maxLength={30}
             defaultValue={owner}
             key={`name-${owner}`}
-            onBlur={(e) => {
+            onBlur={async (e) => {
               const v = e.target.value.trim();
-              if (v !== owner) {
-                setOwnerName(v);
-                say("Name saved.");
+              if (!v || v === owner) return;
+              const res = await fetch("/api/workspace", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: v }),
+              });
+              const body = await res.json().catch(() => null);
+              if (!res.ok) {
+                say(body?.error ?? "Could not save your name.");
+                e.target.value = owner;
+                return;
               }
+              await mutate("/api/workspace", body, { revalidate: false });
+              say("Name saved.");
             }}
           />
         </Row>

@@ -26,6 +26,7 @@ export function SetupWizard() {
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Mother");
@@ -58,7 +59,7 @@ export function SetupWizard() {
     setSaving(true);
     try {
       const person = await api.addPerson({ name: name.trim(), relation, phone, lang });
-      await api.addReminder({
+      const reminder = await api.addReminder({
         personId: person.id,
         text: text.trim(),
         kind: guessKind(text),
@@ -67,6 +68,13 @@ export function SetupWizard() {
         onceDay: repeat === "once" ? nextOnceDay(time) : null,
         lang: null,
       });
+      if (agreed) {
+        await api.grantConsent(person.id);
+        const call = await api.callNow(reminder.id).catch((e: Error) => ({ message: e.message }));
+        say(call.message);
+        router.push("/dashboard");
+        return;
+      }
       say(`Consent message sent to ${person.name}. Calls start after they agree.`);
       router.push("/family");
     } catch (e) {
@@ -206,6 +214,12 @@ export function SetupWizard() {
                   Sent by SMS to +91 {phone.replace(/\D/g, "").replace(/(\d{5})(\d{5})/, "$1 $2")} on behalf of {owner}
                 </small>
               </div>
+              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 3 }} />
+                <span>
+                  {name.trim()} already agreed when I asked them. Skip the message and place a test call now.
+                </span>
+              </label>
             </>
           ) : null}
 
@@ -228,7 +242,7 @@ export function SetupWizard() {
             <MonoLabel as="span">Takes about a minute</MonoLabel>
           )}
           <Button type="submit" disabled={saving}>
-            {step < STEPS ? "Continue" : saving ? "Sending…" : "Send and finish"}
+            {step < STEPS ? "Continue" : saving ? "Saving…" : agreed ? "Finish and test call" : "Send and finish"}
           </Button>
         </div>
       </form>

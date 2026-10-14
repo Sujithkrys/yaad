@@ -2,19 +2,10 @@ import "server-only";
 
 import { unstable_rethrow } from "next/navigation";
 import { ZodError } from "zod";
-import { getWorkspaceId } from "./workspace";
+import { ApiError } from "./api-error";
+import { requireWorkspace, type Workspace } from "./workspace";
 
-/** An error whose message is safe to show to the user. */
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-export const notFound = (what: string) => new ApiError(404, `${what} was not found.`);
+export { ApiError, notFound } from "./api-error";
 
 type PgError = { code?: string; message?: string; details?: string };
 
@@ -27,28 +18,32 @@ export function dbError(error: PgError, conflict = "That already exists."): ApiE
   return new ApiError(500, "Something went wrong saving your changes. Try again.");
 }
 
-type Handler<C> = (ctx: { ws: string; request: Request; params: C }) => Promise<Response | unknown>;
+type Handler<C> = (ctx: { ws: string; workspace: Workspace; request: Request; params: C }) => Promise<Response | unknown>;
+
+export function errorResponse(err: unknown) {
+  // Let Next.js handle its own control-flow errors (prerender bailouts and the like).
+  unstable_rethrow(err);
+  if (err instanceof ApiError) return Response.json({ error: err.message }, { status: err.status });
+  if (err instanceof ZodError) {
+    return Response.json({ error: err.issues[0]?.message ?? "The request is not valid." }, { status: 400 });
+  }
+  console.error("[api]", (err as Error).message);
+  return Response.json({ error: "Something went wrong. Try again." }, { status: 500 });
+}
 
 /**
- * Wraps a route handler: resolves the visitor's workspace, returns JSON, and
- * maps every failure to { error: "<plain sentence>" } without stack traces.
+ * Wraps a route handler: requires the visitor's named workspace, returns JSON,
+ * and maps every failure to { error: "<plain sentence>" } without stack traces.
  */
 export function route<C = Record<string, never>>(handler: Handler<C>) {
   return async (request: Request, context: { params: Promise<C> }) => {
     try {
-      const ws = await getWorkspaceId();
+      const workspace = await requireWorkspace();
       const params = context?.params ? await context.params : ({} as C);
-      const result = await handler({ ws, request, params });
+      const result = await handler({ ws: workspace.id, workspace, request, params });
       return result instanceof Response ? result : Response.json(result ?? { ok: true });
     } catch (err) {
-      // Let Next.js handle its own control-flow errors (prerender bailouts and the like).
-      unstable_rethrow(err);
-      if (err instanceof ApiError) return Response.json({ error: err.message }, { status: err.status });
-      if (err instanceof ZodError) {
-        return Response.json({ error: err.issues[0]?.message ?? "The request is not valid." }, { status: 400 });
-      }
-      console.error("[api]", (err as Error).message);
-      return Response.json({ error: "Something went wrong. Try again." }, { status: 500 });
+      return errorResponse(err);
     }
   };
 }

@@ -66,7 +66,7 @@ export function TodaysCallsPanel({ items, retryMin }: { items: TodayItem[]; retr
     cta = (
       <>
         <CallNowIcon />
-        Call {sel.personName} now
+        Call {sel.personName} {sel.status === "retry" || sel.status === "missed" ? "again" : "now"}
       </>
     );
 
@@ -74,8 +74,8 @@ export function TodaysCallsPanel({ items, retryMin }: { items: TodayItem[]; retr
     if (!sel) return;
     setBusy(true);
     try {
-      await api.callNow(sel.reminderId);
-      say(`Calling ${sel.personName} now.`);
+      const r = await api.callNow(sel.reminderId);
+      say(r.message);
     } catch (e) {
       say((e as Error).message);
     } finally {

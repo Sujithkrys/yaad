@@ -35,6 +35,8 @@ async function then<T>(p: Promise<T>) {
   return out;
 }
 
+export type DialResult = { status: "calling" | "rescheduled" | "failed"; callId: string; message: string };
+
 export type PersonInput = Pick<Person, "name" | "relation" | "phone" | "lang">;
 export type ReminderInput = Pick<Reminder, "personId" | "text" | "kind" | "time" | "repeat" | "onceDay" | "lang">;
 
@@ -54,5 +56,6 @@ export const api = {
   },
   seed: () => then(send<{ people: number; reminders: number; calls: number }>("POST", "/api/seed")),
   reset: () => then(send("POST", "/api/reset")),
-  callNow: (reminderId: string) => send("POST", "/api/calls", { reminderId }),
+  callNow: (reminderId: string) => then(send<DialResult>("POST", "/api/calls", { reminderId })),
+  callAgain: (callId: string) => then(send<DialResult>("POST", `/api/calls/${callId}/dial`)),
 };

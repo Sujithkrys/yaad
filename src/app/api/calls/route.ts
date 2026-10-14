@@ -1,4 +1,6 @@
-import { ApiError, route } from "@/lib/api";
+import { z } from "zod";
+import { readJson, route } from "@/lib/api";
+import { callReminderNow } from "@/lib/calls/dial";
 import { listCalls } from "@/lib/db/repo";
 import { callsQuery } from "@/lib/schemas";
 
@@ -13,7 +15,10 @@ export const GET = route(async ({ ws, request }) => {
   return filtered.slice(0, 200);
 });
 
-// Placing a call needs the Sarvam agent and the scheduler, which come later.
-export const POST = route(async () => {
-  throw new ApiError(501, "Calling is not connected yet.");
+const callNowInput = z.object({ reminderId: z.uuid({ error: "Choose a reminder to call about." }) });
+
+/** "Call now": dials today's call for a reminder. */
+export const POST = route(async ({ workspace, request }) => {
+  const { reminderId } = callNowInput.parse(await readJson(request));
+  return callReminderNow(workspace, reminderId);
 });
