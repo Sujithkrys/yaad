@@ -10,6 +10,7 @@ const person = (id: string, consent: Person["consent"] = "granted"): Person => (
   phone: "9876500011",
   lang: "te-IN",
   consent,
+  isSample: false,
   createdAt: "2026-01-01T00:00:00Z",
 });
 
@@ -48,6 +49,7 @@ const call = (over: Partial<Call>): Call => ({
   nextAttemptAt: null,
   failureReason: null,
   responseNote: null,
+  unwell: false,
   ...over,
 });
 

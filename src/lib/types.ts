@@ -6,9 +6,9 @@ export type ReminderKind = "tablet" | "walk" | "visit" | "other";
 export type Repeat = "daily" | "weekdays" | "once";
 export type Consent = "pending" | "granted";
 /** Stored call states. */
-export type CallState = "calling" | "retry" | "confirmed" | "missed";
-/** What the dashboard shows: stored states plus a slot that has not been called yet. */
-export type CallStatus = CallState | "scheduled";
+export type CallState = "scheduled" | "calling" | "retry" | "confirmed" | "missed";
+/** What the dashboard shows. A slot without a call row is also "scheduled". */
+export type CallStatus = CallState;
 export type Response = "taken" | "later" | "not_taken" | "no_answer" | "unclear";
 
 /** 2 = taken on first ring, 1 = taken after retry, 0 = missed, -1 = not yet, -2 = no reminder that day */
@@ -21,6 +21,8 @@ export type Person = {
   phone: string;
   lang: Lang;
   consent: Consent;
+  /** Added by "Load sample data"; never dialled for real. */
+  isSample: boolean;
   createdAt: string;
 };
 
@@ -66,12 +68,14 @@ export type Call = {
   failureReason: string | null;
   /** call_summary from the agent */
   responseNote: string | null;
+  unwell: boolean;
 };
 
 export type Settings = {
   alert: boolean;
-  alertChannel: "WhatsApp" | "SMS";
+  alertChannel: "WhatsApp" | "SMS" | "Email";
   alertNumber: string;
+  alertEmail: string;
   retryMin: 5 | 10 | 15;
   maxAttempts: number;
   quietOn: boolean;

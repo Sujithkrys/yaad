@@ -43,3 +43,6 @@ next-env.d.ts
 
 # tts:test output
 /.tts-out/
+
+# Screenshots and recordings for marketing
+/launch-media/

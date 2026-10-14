@@ -209,3 +209,11 @@ export function SearchIcon({ size = 14, ...p }: IconProps) {
     </svg>
   );
 }
+
+export function BellIcon({ size = 16, ...p }: IconProps) {
+  return (
+    <svg {...stroke({ size, ...p }, 1.3)}>
+      <path d="M4 11.5V7a4 4 0 018 0v4.5l1.2 1.3H2.8zM6.5 13.8a1.6 1.6 0 003 0" />
+    </svg>
+  );
+}

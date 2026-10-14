@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ApiError, dbError, notFound } from "@/lib/api";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { addDaysIST, istDateAt } from "@/lib/time";
 import type { Call, Person, Reminder, Settings } from "@/lib/types";
@@ -21,6 +22,10 @@ export async function listPeople(ws: string): Promise<Person[]> {
 }
 
 export async function createPerson(ws: string, input: Pick<Person, "name" | "relation" | "phone" | "lang">, consent: Person["consent"] = "pending") {
+  const max = env().MAX_PEOPLE_PER_WORKSPACE;
+  const { count, error: countError } = await db().from("people").select("id", { count: "exact", head: true }).eq("workspace_id", ws);
+  if (countError) throw dbError(countError);
+  if ((count ?? 0) >= max) throw new ApiError(409, `You can add up to ${max} family members in this demo.`);
   const { data, error } = await db()
     .from("people")
     .insert({ workspace_id: ws, ...input, consent })

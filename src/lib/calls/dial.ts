@@ -13,66 +13,96 @@ import type { Lang, Settings } from "../types";
 import type { Workspace } from "../workspace";
 import { applyResult, claimAttempt } from "./apply";
 import { languageName, normalizePhone, openingLine } from "./format";
-import { gateCall, type GateDecision } from "./gate";
+import { COOLDOWN_MS, gateCall, type GateDecision, type RefuseReason } from "./gate";
 import type { WebhookPayload } from "./webhook";
 
 export type DialResult =
   | { status: "calling"; callId: string; mode: "live" | "simulate"; message: string }
   | { status: "rescheduled"; callId: string; at: number; message: string }
+  | { status: "skipped"; callId: string; reason: RefuseReason; message: string }
   | { status: "failed"; callId: string; message: string };
 
-type PersonRow = { id: string; name: string; phone: string; lang: Lang; consent: "pending" | "granted" };
+type PersonRow = { id: string; name: string; phone: string; lang: Lang; consent: "pending" | "granted"; is_sample: boolean };
+type Pending = "scheduled" | "retry";
 
-const REFUSAL: Record<Exclude<GateDecision, { action: "dial" } | { action: "reschedule" }>["reason"], (name: string) => [number, string]> = {
+export const DEMO_LIMIT = "Demo limit reached for today.";
+
+const REFUSAL: Record<RefuseReason, (name: string) => [number, string]> = {
   no_consent: (n) => [409, `${n} has not agreed to calls yet.`],
   bad_phone: (n) => [400, `${n}'s mobile number cannot be called.`],
   not_allowlisted: (n) => [403, `${n}'s number is not on the call allowlist, so no call was placed.`],
-  daily_limit: () => [429, "Today's call limit is reached. Try again tomorrow."],
+  sample_person: (n) => [409, `${n} is from the sample data, so no real call was placed. Add a real family member to try a call.`],
+  daily_limit: () => [429, DEMO_LIMIT],
   cooldown: (n) => [429, `${n} was called a moment ago. Wait two minutes and try again.`],
 };
 
-async function gateFor(person: PersonRow, manual: boolean, settings: Settings) {
+async function gateFor(ws: Workspace, person: PersonRow, manual: boolean, settings: Settings) {
   const e = env();
   const db = supabaseAdmin();
   const now = Date.now();
   const midnight = new Date(istDateAt(dayKeyIST(now), "00:00")).toISOString();
 
-  // The daily limit protects call credits, so it counts every workspace.
-  const today = await db.from("call_attempts").select("id", { count: "exact", head: true }).gte("created_at", midnight);
-  const last = await db
-    .from("call_attempts")
-    .select("created_at, calls!inner(person_id)")
-    .eq("calls.person_id", person.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  if (today.error || last.error) throw new ApiError(500, "Could not check the call limits. Try again.");
+  const [global, mine, last] = await Promise.all([
+    // The global cap protects call credits, so it counts every workspace.
+    db.from("call_attempts").select("id", { count: "exact", head: true }).gte("created_at", midnight),
+    db.from("call_attempts").select("id", { count: "exact", head: true }).eq("workspace_id", ws.id).gte("created_at", midnight),
+    // Cooldown is per number, whoever added it.
+    db
+      .from("call_attempts")
+      .select("created_at, calls!inner(people!inner(phone))")
+      .eq("calls.people.phone", person.phone)
+      .gte("created_at", new Date(now - COOLDOWN_MS).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+  if (global.error || mine.error || last.error) throw new ApiError(500, "Could not check the call limits. Try again.");
 
   return gateCall({
     mode: e.CALL_MODE,
     allowlist: e.CALL_ALLOWLIST,
     phone: normalizePhone(person.phone),
     consent: person.consent,
+    isSample: person.is_sample,
     manual,
-    attemptsToday: today.count ?? 0,
+    attemptsToday: global.count ?? 0,
     maxPerDay: e.MAX_CALLS_PER_DAY,
+    workspaceAttemptsToday: mine.count ?? 0,
+    maxPerWorkspace: e.MAX_CALLS_PER_WORKSPACE_PER_DAY,
     lastAttemptAt: last.data?.[0] ? new Date(last.data[0].created_at).getTime() : null,
     settings,
     now,
   });
 }
 
-/** Throws for refusals; marks the call failed first when the refusal is permanent. */
-async function enforce(decision: GateDecision, person: PersonRow, ws: Workspace, callId: string | null) {
-  if (decision.action !== "refuse") return;
-  if (decision.markFailed && callId) {
-    await supabaseAdmin()
+/**
+ * Handles a refusal. Permanent refusals mark the call missed (not retried).
+ * For a manual press, throws a user-facing error; for the scheduler, returns a result.
+ */
+async function refuse(
+  decision: Extract<GateDecision, { action: "refuse" }>,
+  person: PersonRow,
+  ws: Workspace,
+  callId: string | null,
+  claimed: Pending | null,
+): Promise<DialResult> {
+  const db = supabaseAdmin();
+  const [status, message] = REFUSAL[decision.reason](person.name);
+  if (callId && (decision.markFailed || (claimed && decision.reason === "no_consent"))) {
+    await db
       .from("calls")
-      .update({ status: "missed", failure_reason: decision.reason, done_at: new Date().toISOString() })
+      .update({ status: "missed", failure_reason: decision.reason, done_at: new Date().toISOString(), next_attempt_at: null })
+      .eq("id", callId)
+      .eq("workspace_id", ws.id);
+  } else if (callId && claimed) {
+    // Cooldown: put it back and try again shortly.
+    await db
+      .from("calls")
+      .update({ status: claimed, next_attempt_at: new Date(Date.now() + COOLDOWN_MS).toISOString() })
       .eq("id", callId)
       .eq("workspace_id", ws.id);
   }
-  const [status, message] = REFUSAL[decision.reason](person.name);
-  throw new ApiError(status, message);
+  if (!claimed) throw new ApiError(status, message);
+  return { status: "skipped", callId: callId ?? "", reason: decision.reason, message };
 }
 
 /** A believable result for CALL_MODE=simulate, following settings.demo_outcome. */
@@ -106,12 +136,17 @@ function simulatedPayload(attemptId: string, settings: Settings, lang: Lang, nam
   };
 }
 
-/** Dials an existing call row. Used by "Call now", "Call again" and the setup test call. */
-export async function dialCall(ws: Workspace, callId: string, opts: { manual: boolean }): Promise<DialResult> {
+/**
+ * Dials a call row. Used by "Call now", "Call again", the setup test call and
+ * the scheduler. The scheduler passes `claimed` after atomically moving the
+ * row to 'calling', so the in-progress check is skipped.
+ */
+export async function dialCall(ws: Workspace, callId: string, opts: { manual: boolean; claimed?: Pending }): Promise<DialResult> {
   const db = supabaseAdmin();
+  const claimed = opts.claimed ?? null;
   const { data: call, error } = await db
     .from("calls")
-    .select("id, status, attempt, kind, reminder_text, lang, person_id, people(id, name, phone, lang, consent)")
+    .select("id, status, attempt, kind, reminder_text, lang, person_id, people(id, name, phone, lang, consent, is_sample)")
     .eq("workspace_id", ws.id)
     .eq("id", callId)
     .maybeSingle();
@@ -119,15 +154,16 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
   if (!call) throw new ApiError(404, "That call was not found.");
   const person = call.people as unknown as PersonRow | null;
   if (!person) throw new ApiError(404, "That person was not found.");
-  if (call.status === "calling") throw new ApiError(409, `${person.name} is already being called.`);
-  if (call.status === "confirmed" && !opts.manual) throw new ApiError(409, "This reminder is already confirmed.");
+  if (!claimed && call.status === "calling") throw new ApiError(409, `${person.name} is already being called.`);
 
   const settings = await getSettings(ws.id);
-  const decision = await gateFor(person, opts.manual, settings);
-  await enforce(decision, person, ws, call.id);
+  const decision = await gateFor(ws, person, opts.manual, settings);
+  if (decision.action === "refuse") return refuse(decision, person, ws, call.id, claimed);
 
   if (decision.action === "reschedule") {
-    await db.from("calls").update({ status: "retry", next_attempt_at: new Date(decision.at).toISOString() }).eq("id", call.id).eq("workspace_id", ws.id);
+    // next_attempt_at, not scheduled_at: the slot keeps its identity, so the scheduler never re-creates it.
+    const back: Pending = claimed ?? ((call.attempt ?? 0) > 0 ? "retry" : "scheduled");
+    await db.from("calls").update({ status: back, next_attempt_at: new Date(decision.at).toISOString() }).eq("id", call.id).eq("workspace_id", ws.id);
     return { status: "rescheduled", callId: call.id, at: decision.at, message: `Quiet hours are on, so ${person.name} will be called when they end.` };
   }
 
@@ -141,10 +177,13 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
     .insert({ workspace_id: ws.id, call_id: call.id, attempt_no: attemptNo, status: "dialing" })
     .select("id")
     .single();
-  if (aErr || !attempt) throw new ApiError(500, "Could not start the call. Try again.");
+  if (aErr || !attempt) {
+    if (claimed) await db.from("calls").update({ status: claimed }).eq("id", call.id).eq("workspace_id", ws.id);
+    throw new ApiError(500, "Could not start the call. Try again.");
+  }
   await db
     .from("calls")
-    .update({ status: "calling", attempt: attemptNo, next_attempt_at: null, failure_reason: null, manual: opts.manual || undefined })
+    .update({ status: "calling", attempt: attemptNo, next_attempt_at: null, failure_reason: null, ...(opts.manual ? { manual: true } : {}) })
     .eq("id", call.id)
     .eq("workspace_id", ws.id);
 
@@ -155,8 +194,8 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
     after(async () => {
       await new Promise((r) => setTimeout(r, 6000 + Math.random() * 4000));
       try {
-        const claimed = await claimAttempt(simId, payload);
-        if (claimed) await applyResult(claimed, payload);
+        const got = await claimAttempt(simId, payload);
+        if (got) await applyResult(got, payload);
       } catch (err) {
         console.error("[calls] simulated result failed", (err as Error).message);
       }
@@ -185,8 +224,8 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
     const failId = `failed_${attempt.id}`;
     await db.from("call_attempts").update({ sarvam_attempt_id: failId }).eq("id", attempt.id);
     const payload: WebhookPayload = { attempt_id: failId, status: "failed", failure_reason: reason };
-    const claimed = await claimAttempt(failId, payload);
-    if (claimed) await applyResult(claimed, payload);
+    const got = await claimAttempt(failId, payload);
+    if (got) await applyResult(got, payload);
     return { status: "failed", callId: call.id, message: `The call to ${person.name} could not be placed. Try again in a few minutes.` };
   }
 }
@@ -196,7 +235,7 @@ export async function callReminderNow(ws: Workspace, reminderId: string): Promis
   const db = supabaseAdmin();
   const { data: r, error } = await db
     .from("reminders")
-    .select("id, kind, reminder_text, lang, person_id, people(id, name, phone, lang, consent)")
+    .select("id, kind, reminder_text, lang, person_id, people(id, name, phone, lang, consent, is_sample)")
     .eq("workspace_id", ws.id)
     .eq("id", reminderId)
     .maybeSingle();
@@ -223,7 +262,8 @@ export async function callReminderNow(ws: Workspace, reminderId: string): Promis
 
   // Check the gate before creating a row, so refusals leave nothing behind.
   const settings = await getSettings(ws.id);
-  await enforce(await gateFor(person, true, settings), person, ws, null);
+  const decision = await gateFor(ws, person, true, settings);
+  if (decision.action === "refuse") return refuse(decision, person, ws, null, null);
 
   const { data: call, error: cErr } = await db
     .from("calls")
@@ -235,7 +275,7 @@ export async function callReminderNow(ws: Workspace, reminderId: string): Promis
       reminder_text: r.reminder_text,
       lang: r.lang ?? person.lang,
       scheduled_at: new Date(now).toISOString(),
-      status: "retry",
+      status: "scheduled",
       attempt: 0,
       manual: true,
     })

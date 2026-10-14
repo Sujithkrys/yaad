@@ -29,8 +29,8 @@ export function canCall(p: Person | undefined): p is Person {
 function callNote(c: Call, retryMin: number, now: number) {
   if (c.status === "confirmed") return fmtTs(c.doneAt ?? c.scheduledAt);
   if (c.status === "calling") return "ringing";
-  if (c.status === "retry") {
-    const due = c.nextAttemptAt ?? (c.doneAt ?? c.scheduledAt) + retryMin * MINUTE;
+  if (c.status === "scheduled" || c.status === "retry") {
+    const due = c.nextAttemptAt ?? (c.status === "scheduled" ? c.scheduledAt : (c.doneAt ?? c.scheduledAt) + retryMin * MINUTE);
     return due > now ? fmtIn(due - now) : "due now";
   }
   return c.response === "not_taken" ? "said no" : "no answer";

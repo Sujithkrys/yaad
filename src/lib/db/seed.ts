@@ -52,7 +52,7 @@ export async function seedWorkspace(ws: string, settings: Settings, now = Date.n
 
   const { data: people, error: pErr } = await db
     .from("people")
-    .insert(PEOPLE.map(({ name, relation, phone, lang, consent }) => ({ workspace_id: ws, name, relation, phone, lang, consent })))
+    .insert(PEOPLE.map(({ name, relation, phone, lang, consent }) => ({ workspace_id: ws, name, relation, phone, lang, consent, is_sample: true })))
     .select("id, name");
   if (pErr || !people) throw dbError(pErr ?? {});
   const idOf = (key: string) => people.find((p) => p.name === PEOPLE.find((s) => s.key === key)!.name)!.id as string;

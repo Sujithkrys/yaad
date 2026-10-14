@@ -12,6 +12,13 @@ import { useFamily, useOwnerName, useSettings } from "@/lib/client/hooks";
 import type { Settings } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
 
+function SchedulerChip({ seconds }: { seconds: number | null }) {
+  if (seconds === null) return <Pill variant="missed">Not running</Pill>;
+  const min = Math.max(0, Math.round(seconds / 60));
+  const healthy = min <= 5;
+  return <Pill variant={healthy ? "confirmed" : "retry"}>{`Last tick ${min < 1 ? "just now" : `${min}m ago`}`}</Pill>;
+}
+
 function Row({ title, desc, children }: { title: string; desc: string; children: ReactNode }) {
   return (
     <div className="set-row">
@@ -30,6 +37,11 @@ export function SettingsView() {
   const owner = useOwnerName();
   const say = useToast();
   const health = useSWR<{ mode: string; ready: boolean; allowlist: number }>("/api/health/sarvam", fetcher).data;
+  const scheduler = useSWR<{ secondsSinceTick: number | null; counts: { scheduled: number; retry: number; calling: number } }>(
+    "/api/health/scheduler",
+    fetcher,
+    { refreshInterval: 30_000 },
+  ).data;
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -63,6 +75,7 @@ export function SettingsView() {
   return (
     <div className="view-stack" style={{ maxWidth: 720 }}>
       <h2 className="set-title">Calls</h2>
+      <p className="foot-note" style={{ margin: "-8px 4px 0" }}>Calls are placed only to numbers you add with the person&apos;s consent.</p>
       <Card className="set-card">
         <Row
           title="Phone calls"
@@ -71,7 +84,9 @@ export function SettingsView() {
               ? "Checking the Sarvam connection."
               : health.mode === "live"
                 ? health.ready
-                  ? `Real calls through Sarvam. Only ${health.allowlist} allowlisted number${health.allowlist === 1 ? "" : "s"} can be called.`
+                  ? health.allowlist
+                    ? `Real calls through Sarvam, only to ${health.allowlist} allowlisted number${health.allowlist === 1 ? "" : "s"}.`
+                    : "Real calls through Sarvam."
                   : "Live mode is on, but some Sarvam settings are missing on the server."
                 : "Simulated: no real phone rings. Results arrive after a few seconds so you can try the app."
           }
@@ -100,6 +115,16 @@ export function SettingsView() {
             </select>
           </Row>
         ) : null}
+        <Row
+          title="Scheduler"
+          desc={
+            scheduler
+              ? `${scheduler.counts.scheduled} scheduled · ${scheduler.counts.retry} waiting to retry · ${scheduler.counts.calling} ringing`
+              : "Places reminder calls on time and retries missed ones."
+          }
+        >
+          {scheduler ? <SchedulerChip seconds={scheduler.secondsSinceTick} /> : null}
+        </Row>
         <Row title="Calls per reminder" desc="The first call plus retries before it counts as missed.">
           <select className="input" aria-label="Calls per reminder" value={s.maxAttempts} onChange={(e) => save({ maxAttempts: Number(e.target.value) })}>
             {[1, 2, 3].map((n) => (
@@ -160,8 +185,24 @@ export function SettingsView() {
           >
             <option>WhatsApp</option>
             <option>SMS</option>
+            <option>Email</option>
           </select>
         </Row>
+        {s.alertChannel === "Email" ? (
+          <Row title="Alert email" desc="Where missed-call alerts are emailed.">
+            <input
+              className="input"
+              style={{ width: 220 }}
+              type="email"
+              aria-label="Alert email"
+              placeholder="you@example.com"
+              disabled={!s.alert}
+              defaultValue={s.alertEmail}
+              key={`email-${s.alertEmail}`}
+              onBlur={(e) => e.target.value.trim() !== s.alertEmail && save({ alertEmail: e.target.value.trim() })}
+            />
+          </Row>
+        ) : null}
         <Row title="Alert number" desc="Your 10 digit mobile number.">
           <input
             className="input"

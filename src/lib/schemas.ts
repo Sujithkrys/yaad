@@ -34,11 +34,12 @@ export const reminderPatch = reminderInput.partial().extend({ active: z.boolean(
 export const settingsInput = z
   .object({
     alert: z.boolean(),
-    alertChannel: z.enum(["WhatsApp", "SMS"]),
+    alertChannel: z.enum(["WhatsApp", "SMS", "Email"]),
     alertNumber: z
       .string()
       .transform((s) => s.replace(/\D/g, ""))
       .pipe(z.string().regex(/^$|^[6-9]\d{9}$/, "Enter a 10 digit number for alerts, or leave it empty.")),
+    alertEmail: z.union([z.literal(""), z.email("Enter a valid email address, or leave it empty.")]),
     retryMin: z.union([z.literal(5), z.literal(10), z.literal(15)], { error: "Retry after 5, 10 or 15 minutes." }),
     maxAttempts: z.number().int().min(1).max(3),
     quietOn: z.boolean(),
@@ -51,6 +52,6 @@ export const settingsInput = z
 
 export const callsQuery = z.object({
   person: z.uuid().optional().catch(undefined),
-  status: z.enum(["calling", "retry", "confirmed", "missed"]).optional().catch(undefined),
+  status: z.enum(["scheduled", "calling", "retry", "confirmed", "missed"]).optional().catch(undefined),
   q: z.string().trim().max(60).optional(),
 });

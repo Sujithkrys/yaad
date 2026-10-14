@@ -10,6 +10,7 @@ export type PersonRow = {
   phone: string;
   lang: Person["lang"];
   consent: Person["consent"];
+  is_sample?: boolean;
   created_at: string;
 };
 
@@ -48,6 +49,7 @@ export type CallRow = {
   next_attempt_at?: string | null;
   failure_reason?: string | null;
   response_note?: string | null;
+  unwell?: boolean;
   people?: { name: string } | null;
 };
 
@@ -56,6 +58,7 @@ export type SettingsRow = {
   alert: boolean;
   alert_channel: Settings["alertChannel"];
   alert_number: string;
+  alert_email?: string;
   retry_min: Settings["retryMin"];
   max_attempts: number;
   quiet_on: boolean;
@@ -72,6 +75,7 @@ export const toPerson = (r: PersonRow): Person => ({
   phone: r.phone,
   lang: r.lang,
   consent: r.consent,
+  isSample: r.is_sample ?? false,
   createdAt: r.created_at,
 });
 
@@ -109,12 +113,14 @@ export const toCall = (r: CallRow): Call => ({
   nextAttemptAt: r.next_attempt_at ? new Date(r.next_attempt_at).getTime() : null,
   failureReason: r.failure_reason ?? null,
   responseNote: r.response_note ?? null,
+  unwell: r.unwell ?? false,
 });
 
 export const toSettings = (r: SettingsRow): Settings => ({
   alert: r.alert,
   alertChannel: r.alert_channel,
   alertNumber: r.alert_number,
+  alertEmail: r.alert_email ?? "",
   retryMin: r.retry_min,
   maxAttempts: r.max_attempts,
   quietOn: r.quiet_on,
@@ -130,6 +136,7 @@ export function settingsPatch(s: Partial<Settings>) {
     alert: "alert",
     alertChannel: "alert_channel",
     alertNumber: "alert_number",
+    alertEmail: "alert_email",
     retryMin: "retry_min",
     maxAttempts: "max_attempts",
     quietOn: "quiet_on",

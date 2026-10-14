@@ -9,10 +9,13 @@
     "lint": "eslint",
     "tts:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/tts-test.mjs",
     "test": "vitest run",
-    "call:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/call-test.mjs"
+    "call:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/call-test.mjs",
+    "tick": "node --env-file-if-exists=.env.local scripts/tick.mjs",
+    "qstash:schedule": "node --env-file-if-exists=.env.local scripts/qstash-schedule.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
+    "@upstash/qstash": "^2.12.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

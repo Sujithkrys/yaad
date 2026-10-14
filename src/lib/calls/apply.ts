@@ -1,5 +1,6 @@
 import "server-only";
 
+import { sendPendingAlerts } from "../alerts/send";
 import { getSettings } from "../db/repo";
 import { supabaseAdmin } from "../supabase-admin";
 import type { TranscriptLine } from "../types";
@@ -35,6 +36,19 @@ export async function claimAttempt(attemptId: string, payload: WebhookPayload): 
   return row ? { callId: row.call_id, workspaceId: row.workspace_id, attemptNo: row.attempt_no } : null;
 }
 
+/** Same as claimAttempt, by our own attempt row id. Used to time out attempts whose webhook never came. */
+export async function claimStaleAttempt(attemptRowId: string, payload: WebhookPayload): Promise<Claimed | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("call_attempts")
+    .update({ status: "failed", failure_reason: payload.failure_reason ?? "webhook_timeout", finished_at: new Date().toISOString() })
+    .eq("id", attemptRowId)
+    .eq("status", "dialing")
+    .select("call_id, workspace_id, attempt_no");
+  if (error) throw new Error(`stale claim failed: ${error.code}`);
+  const row = data?.[0];
+  return row ? { callId: row.call_id, workspaceId: row.workspace_id, attemptNo: row.attempt_no } : null;
+}
+
 function transcriptLines(payload: WebhookPayload): TranscriptLine[] {
   let sec = 2;
   return (payload.interaction_transcript ?? [])
@@ -48,24 +62,11 @@ function transcriptLines(payload: WebhookPayload): TranscriptLine[] {
     });
 }
 
-export async function raiseAlert(input: { workspaceId: string; callId: string; personId: string; kind: "missed" | "unwell"; message: string; channel: string | null }) {
-  // Stub: records the alert. Delivery by WhatsApp or SMS comes with QStash.
-  const { error } = await supabaseAdmin().from("alerts").insert({
-    workspace_id: input.workspaceId,
-    call_id: input.callId,
-    person_id: input.personId,
-    kind: input.kind,
-    message: input.message,
-    channel: input.channel,
-  });
-  if (error) console.error("[alerts] insert failed", error.code);
-}
-
 export async function applyResult(claimed: Claimed, payload: WebhookPayload) {
   const db = supabaseAdmin();
   const { data: call, error } = await db
     .from("calls")
-    .select("id, person_id, reminder_text, duration_sec, alerted, people(name)")
+    .select("id, duration_sec")
     .eq("id", claimed.callId)
     .eq("workspace_id", claimed.workspaceId)
     .maybeSingle();
@@ -102,25 +103,11 @@ export async function applyResult(claimed: Claimed, payload: WebhookPayload) {
   if (lines.length) update.lines = lines;
   if (summary) update.response_note = summary;
   if (outcome.done) update.done_at = new Date(now).toISOString();
-
-  const sendAlert = outcome.alert === "unwell" || (outcome.alert === "missed" && settings.alert);
-  if (sendAlert) update.alerted = true;
+  if (outcome.alert === "unwell") update.unwell = true;
 
   const { error: upErr } = await db.from("calls").update(update).eq("id", call.id).eq("workspace_id", claimed.workspaceId);
   if (upErr) throw new Error(`call update failed: ${upErr.code}`);
 
-  if (sendAlert && outcome.alert) {
-    const name = (call.people as { name?: string } | null)?.name ?? "Your family member";
-    await raiseAlert({
-      workspaceId: claimed.workspaceId,
-      callId: call.id,
-      personId: call.person_id,
-      kind: outcome.alert,
-      channel: settings.alertChannel,
-      message:
-        outcome.alert === "unwell"
-          ? `${name} said they are not feeling well during the ${call.reminder_text} call. Please check on them.`
-          : `${name} did not confirm ${call.reminder_text} after ${claimed.attemptNo} calls.`,
-    });
-  }
+  // Alerts are sent once, by the same claim the scheduler uses.
+  if (outcome.alert) await sendPendingAlerts({ callId: call.id });
 }

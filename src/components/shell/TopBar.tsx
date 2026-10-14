@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useDialogs } from "@/components/app/DialogsProvider";
 import { Button, MonoLabel, PlusIcon } from "@/components/ui";
+import { AlertsBell } from "./AlertsBell";
 import { useCalls, useDashboard, useFamily, useOwnerName, useReminders } from "@/lib/client/hooks";
 import { fmtLongDate, greetingWord } from "@/lib/time";
 
@@ -67,7 +68,10 @@ export function TopBar() {
         <h1>{head.title || " "}</h1>
         <MonoLabel>{head.sub || " "}</MonoLabel>
       </div>
-      {head.actions ? <div className="top-actions">{head.actions}</div> : null}
+      <div className="top-actions">
+        <AlertsBell />
+        {head.actions}
+      </div>
     </header>
   );
 }

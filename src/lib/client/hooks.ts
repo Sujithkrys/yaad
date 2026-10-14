@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   alert: true,
   alertChannel: "WhatsApp",
   alertNumber: "",
+  alertEmail: "",
   retryMin: 10,
   maxAttempts: 2,
   quietOn: true,

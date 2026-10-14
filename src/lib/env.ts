@@ -24,6 +24,18 @@ const schema = z.object({
   CALL_MODE: z.enum(["live", "simulate"]).default("simulate"),
   CALL_ALLOWLIST: csv,
   MAX_CALLS_PER_DAY: z.coerce.number().int().positive().default(40),
+  MAX_CALLS_PER_WORKSPACE_PER_DAY: z.coerce.number().int().positive().default(8),
+  MAX_PEOPLE_PER_WORKSPACE: z.coerce.number().int().positive().default(5),
+
+  QSTASH_URL: z.url().optional(),
+  QSTASH_TOKEN: z.string().trim().min(1).optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().trim().min(1).optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().trim().min(1).optional(),
+  /** Only honoured when NODE_ENV !== "production". */
+  CRON_DEV_SECRET: z.string().trim().min(16, "CRON_DEV_SECRET must be at least 16 characters").optional(),
+
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
+  ALERT_FROM_EMAIL: z.string().trim().min(3).optional(),
 });
 
 export type Env = z.infer<typeof schema>;

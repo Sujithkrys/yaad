@@ -99,30 +99,50 @@ describe("language mapping", () => {
 describe("gateCall", () => {
   const base: GateInput = {
     mode: "live",
-    allowlist: ["+919876543210"],
+    allowlist: [],
     phone: "+919876543210",
     consent: "granted",
+    isSample: false,
     manual: false,
     attemptsToday: 0,
     maxPerDay: 40,
+    workspaceAttemptsToday: 0,
+    maxPerWorkspace: 8,
     lastAttemptAt: null,
     settings: { quietOn: true, quietFrom: "22:00", quietTo: "06:00" },
     now: NOW,
   };
 
-  it("dials when everything checks out", () => {
+  it("open mode: an empty allowlist allows any valid number", () => {
     expect(gateCall(base)).toEqual({ action: "dial" });
+    expect(gateCall({ ...base, phone: "+919000000000" })).toEqual({ action: "dial" });
   });
 
-  it("refuses numbers that are not allowlisted in live mode and marks the call failed", () => {
-    expect(gateCall({ ...base, phone: "+919000000000" })).toEqual({ action: "refuse", reason: "not_allowlisted", markFailed: true });
-    expect(gateCall({ ...base, mode: "simulate", phone: "+919000000000" })).toEqual({ action: "dial" });
+  it("list mode: refuses numbers that are not on the allowlist and marks the call failed", () => {
+    const listed = { ...base, allowlist: ["+919876543210"] };
+    expect(gateCall(listed)).toEqual({ action: "dial" });
+    expect(gateCall({ ...listed, phone: "+919000000000" })).toEqual({ action: "refuse", reason: "not_allowlisted", markFailed: true });
+    expect(gateCall({ ...listed, mode: "simulate", phone: "+919000000000" })).toEqual({ action: "dial" });
   });
 
-  it("refuses without consent, over the daily limit and inside the cooldown", () => {
+  it("always needs consent and a valid number", () => {
     expect(gateCall({ ...base, consent: "pending" })).toMatchObject({ reason: "no_consent" });
-    expect(gateCall({ ...base, attemptsToday: 40 })).toMatchObject({ reason: "daily_limit" });
-    expect(gateCall({ ...base, lastAttemptAt: NOW - 60_000 })).toMatchObject({ reason: "cooldown" });
+    expect(gateCall({ ...base, phone: null })).toMatchObject({ reason: "bad_phone", markFailed: true });
+  });
+
+  it("never dials sample family members for real", () => {
+    expect(gateCall({ ...base, isSample: true })).toMatchObject({ reason: "sample_person", markFailed: true });
+    expect(gateCall({ ...base, isSample: true, mode: "simulate" })).toEqual({ action: "dial" });
+  });
+
+  it("enforces the global and the per-workspace daily caps, marking the call failed", () => {
+    expect(gateCall({ ...base, attemptsToday: 40 })).toEqual({ action: "refuse", reason: "daily_limit", markFailed: true });
+    expect(gateCall({ ...base, workspaceAttemptsToday: 8 })).toEqual({ action: "refuse", reason: "daily_limit", markFailed: true });
+    expect(gateCall({ ...base, attemptsToday: 39, workspaceAttemptsToday: 7 })).toEqual({ action: "dial" });
+  });
+
+  it("keeps a two-minute cooldown per number", () => {
+    expect(gateCall({ ...base, lastAttemptAt: NOW - 60_000 })).toMatchObject({ reason: "cooldown", markFailed: false });
     expect(gateCall({ ...base, lastAttemptAt: NOW - 3 * 60_000 })).toEqual({ action: "dial" });
   });
 
