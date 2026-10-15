@@ -18,11 +18,13 @@ function fail(msg) {
 
 const phone = normalizePhone(process.argv[2]);
 if (!phone) fail("Usage: pnpm call:test +91XXXXXXXXXX [hi|te|ta|kn|en]");
-const lang = (process.argv[3] ?? "hi").slice(0, 2).toLowerCase();
+const lang = (process.argv.slice(3).find((a) => !a.startsWith("--")) ?? "hi").slice(0, 2).toLowerCase();
 if (!LANGS[lang]) fail(`Unknown language "${lang}". Use one of: ${Object.keys(LANGS).join(", ")}.`);
 
+const dryRun = process.argv.includes("--dry-run");
 const allow = (process.env.CALL_ALLOWLIST ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-if (!allow.includes(phone)) fail(`${phone} is not in CALL_ALLOWLIST. Add it to .env.local first.`);
+// Empty allowlist = open mode, same as the app. A set list must include the number.
+if (allow.length && !allow.includes(phone)) fail(`${phone} is not in CALL_ALLOWLIST.`);
 
 const need = ["SARVAM_API_KEY", "SARVAM_ORG_ID", "SARVAM_WORKSPACE_ID", "SARVAM_APP_ID", "SARVAM_APP_VERSION", "SARVAM_CONNECTION_ID", "SARVAM_AGENT_PHONE"];
 const missing = need.filter((k) => !process.env[k]);
@@ -49,6 +51,18 @@ const body = {
 };
 
 const url = `https://apps.sarvam.ai/api/outbounds/v1/orgs/${process.env.SARVAM_ORG_ID}/workspaces/${process.env.SARVAM_WORKSPACE_ID}/outbounds`;
+if (dryRun) {
+  const mask = (v) => (v ? `${String(v).slice(0, 4)}***` : "(not set)");
+  const shown = structuredClone(body);
+  shown.webhook_config.url = shown.webhook_config.url.replace(/token=[^&]+/, "token=***");
+  shown.user_config.user_phone_number = `${phone.slice(0, 5)}*****${phone.slice(-2)}`;
+  console.log("DRY RUN: nothing was sent.");
+  console.log(`POST ${url.replace(process.env.SARVAM_ORG_ID, mask(process.env.SARVAM_ORG_ID)).replace(process.env.SARVAM_WORKSPACE_ID, mask(process.env.SARVAM_WORKSPACE_ID))}`);
+  console.log(`X-API-Key: ${mask(process.env.SARVAM_API_KEY)}`);
+  console.log(JSON.stringify(shown, null, 2));
+  process.exit(0);
+}
+
 const res = await fetch(url, {
   method: "POST",
   headers: { "Content-Type": "application/json", "X-API-Key": process.env.SARVAM_API_KEY },

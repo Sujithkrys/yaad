@@ -21,7 +21,7 @@ Then open `/dashboard`. On first visit you pick a name; it must be unique and cr
 | `pnpm test` | Unit tests (vitest) |
 | `pnpm lint` | ESLint |
 | `pnpm tts:test` | Checks `SARVAM_API_KEY` with one text-to-speech request |
-| `pnpm call:test +91XXXXXXXXXX [hi\|te\|ta\|kn\|en]` | Places one real call; only to numbers in `CALL_ALLOWLIST` |
+| `pnpm call:test +91XXXXXXXXXX [hi\|te\|ta\|kn\|en] [--dry-run]` | Places one real call (respects `CALL_ALLOWLIST` when set); `--dry-run` prints the request with secrets masked and sends nothing |
 | `pnpm tick [baseUrl]` | Runs one scheduler tick locally (uses `CRON_DEV_SECRET`) |
 | `pnpm qstash:schedule` | Creates or updates the QStash schedule for `/api/cron/tick` |
 
