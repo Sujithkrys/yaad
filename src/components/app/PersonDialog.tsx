@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useToast } from "@/components/shell/Toast";
 import { Button, CloseIcon, Modal } from "@/components/ui";
+import { normalizePhone } from "@/lib/calls/format";
 import { api } from "@/lib/client/api";
 import { useFamily, useSettings } from "@/lib/client/hooks";
 import type { Lang, Person } from "@/lib/types";
@@ -10,10 +11,9 @@ import { LANGUAGES } from "@/lib/voices";
 
 export const RELATIONS = ["Mother", "Father", "Grandmother", "Grandfather", "Spouse", "Other"];
 
-/** Indian mobile number: 10 digits starting 6 to 9, spaces allowed. */
+/** Indian mobile number: 10 digits starting 6 to 9; spaces and a +91, 91 or 0 prefix are fine. */
 export function cleanPhone(raw: string) {
-  const digits = raw.replace(/\D/g, "");
-  return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+  return normalizePhone(raw)?.slice(3) ?? null;
 }
 
 type Props = { open: boolean; personId?: string; onClose: () => void };
@@ -100,7 +100,7 @@ function PersonForm({ family, defaultLang, personId, onClose }: Props & { family
               id="per-phone"
               className="input"
               inputMode="numeric"
-              maxLength={11}
+              maxLength={16}
               placeholder="98765 43210"
               autoComplete="off"
               value={phone}

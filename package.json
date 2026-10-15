@@ -11,7 +11,8 @@
     "test": "vitest run",
     "call:test": "node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local scripts/call-test.mjs",
     "tick": "node --env-file-if-exists=.env.local scripts/tick.mjs",
-    "qstash:schedule": "node --env-file-if-exists=.env.local scripts/qstash-schedule.mjs"
+    "qstash:schedule": "node --env-file-if-exists=.env.local scripts/qstash-schedule.mjs",
+    "e2e": "node --env-file-if-exists=.env.local scripts/e2e.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

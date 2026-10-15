@@ -24,7 +24,7 @@ type Row = {
 };
 
 /** Sends pending family alerts. Pass a callId to handle just that call (right after a webhook). */
-export async function sendPendingAlerts(opts: { callId?: string } = {}) {
+export async function sendPendingAlerts(opts: { callId?: string; workspaceId?: string } = {}) {
   const db = supabaseAdmin();
   const names = new Map<string, string>();
 
@@ -36,6 +36,7 @@ export async function sendPendingAlerts(opts: { callId?: string } = {}) {
         .eq("alerted", false)
         .or("status.eq.missed,unwell.eq.true,and(status.eq.confirmed,attempt.gt.3)");
       q = opts.callId ? q.eq("id", opts.callId) : q.gte("done_at", new Date(Date.now() - LOOKBACK_MS).toISOString());
+      if (opts.workspaceId) q = q.eq("workspace_id", opts.workspaceId);
       const { data, error } = await q.limit(50);
       if (error) throw new Error(`alert candidates failed: ${error.code}`);
       return (data as unknown as Row[]).map((r): AlertCandidate => {

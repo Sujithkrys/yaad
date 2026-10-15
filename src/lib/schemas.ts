@@ -1,9 +1,13 @@
 import { z } from "zod";
+import { normalizePhone } from "./calls/format";
 
 // Request validation for the API routes. Rules match the database checks.
 
 const LANGS = ["hi-IN", "te-IN", "ta-IN", "kn-IN", "en-IN"] as const;
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+/** Accepts 98765 43210, +91 98765 43210, 919876543210 or 09876543210; stores the 10 digits. */
+const tenDigits = (s: string) => normalizePhone(s)?.slice(3) ?? s.replace(/\D/g, "");
 
 export const lang = z.enum(LANGS, { error: "Choose a supported language." });
 
@@ -12,7 +16,7 @@ export const personInput = z.object({
   relation: z.string().trim().min(1).max(30).default("Other"),
   phone: z
     .string({ error: "Enter a 10 digit mobile number." })
-    .transform((s) => s.replace(/\D/g, ""))
+    .transform(tenDigits)
     .pipe(z.string().regex(/^[6-9]\d{9}$/, "Enter a 10 digit mobile number.")),
   lang,
 });
@@ -37,7 +41,7 @@ export const settingsInput = z
     alertChannel: z.enum(["WhatsApp", "SMS", "Email"]),
     alertNumber: z
       .string()
-      .transform((s) => s.replace(/\D/g, ""))
+      .transform((s) => (s.trim() ? tenDigits(s) : ""))
       .pipe(z.string().regex(/^$|^[6-9]\d{9}$/, "Enter a 10 digit number for alerts, or leave it empty.")),
     alertEmail: z.union([z.literal(""), z.email("Enter a valid email address, or leave it empty.")]),
     retryMin: z.union([z.literal(5), z.literal(10), z.literal(15)], { error: "Retry after 5, 10 or 15 minutes." }),

@@ -208,7 +208,7 @@ export function SettingsView() {
             className="input"
             aria-label="Alert number"
             inputMode="numeric"
-            maxLength={11}
+            maxLength={16}
             placeholder="98765 43210"
             disabled={!s.alert}
             defaultValue={s.alertNumber}

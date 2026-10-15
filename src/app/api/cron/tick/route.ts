@@ -1,6 +1,6 @@
 import { Receiver } from "@upstash/qstash";
 import { env } from "@/lib/env";
-import { authorizeTick } from "@/lib/scheduler/auth";
+import { tickCaller } from "@/lib/scheduler/auth";
 import { runTick } from "@/lib/scheduler/tick";
 
 export const maxDuration = 30;
@@ -9,7 +9,7 @@ export const maxDuration = 30;
 export async function POST(request: Request) {
   const e = env();
   const body = await request.text();
-  const ok = await authorizeTick({
+  const caller = await tickCaller({
     nodeEnv: process.env.NODE_ENV,
     authorization: request.headers.get("authorization"),
     devSecret: e.CRON_DEV_SECRET,
@@ -20,10 +20,13 @@ export async function POST(request: Request) {
       return receiver.verify({ signature, body, clockTolerance: 5 });
     },
   });
-  if (!ok) return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (!caller) return Response.json({ error: "Unauthorized." }, { status: 401 });
 
+  // Development only: ?workspace=<id> limits the tick to one workspace, so local
+  // testing never touches other people's calls in a shared database.
+  const scope = caller === "dev" ? (new URL(request.url).searchParams.get("workspace") ?? undefined) : undefined;
   try {
-    return Response.json(await runTick());
+    return Response.json(await runTick(Date.now(), { workspaceId: scope }));
   } catch (err) {
     console.error("[tick] failed", (err as Error).message);
     return Response.json({ error: "Tick failed." }, { status: 500 });

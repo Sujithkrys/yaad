@@ -128,7 +128,7 @@ export function SetupWizard() {
               <div className="two">
                 <div className="field">
                   <label htmlFor="wz-phone">Mobile number</label>
-                  <input id="wz-phone" className="input" inputMode="numeric" maxLength={11} placeholder="98765 43210" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <input id="wz-phone" className="input" inputMode="numeric" maxLength={16} placeholder="98765 43210" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
                 <div className="field">
                   <label htmlFor="wz-lang">Language</label>

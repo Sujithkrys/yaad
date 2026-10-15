@@ -20,15 +20,20 @@ export type TickAuthInput = {
 /**
  * Production: only a valid QStash signature. Development: also a bearer
  * CRON_DEV_SECRET, so `pnpm tick` works. The bearer is never honoured in production.
+ * Returns how the caller was authorised, or null.
  */
-export async function authorizeTick(i: TickAuthInput): Promise<boolean> {
+export async function tickCaller(i: TickAuthInput): Promise<"dev" | "qstash" | null> {
   if (i.nodeEnv !== "production" && i.devSecret && i.authorization?.startsWith("Bearer ")) {
-    if (safeEqual(i.authorization.slice(7), i.devSecret)) return true;
+    if (safeEqual(i.authorization.slice(7), i.devSecret)) return "dev";
   }
-  if (!i.signature) return false;
+  if (!i.signature) return null;
   try {
-    return await i.verifySignature(i.signature);
+    return (await i.verifySignature(i.signature)) ? "qstash" : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function authorizeTick(i: TickAuthInput): Promise<boolean> {
+  return (await tickCaller(i)) !== null;
 }

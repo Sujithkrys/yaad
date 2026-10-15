@@ -12,17 +12,22 @@ import { dispatchDue, type DueCall } from "./dispatch";
 import { planSlots, type PlanPerson } from "./materialise";
 import { recoverStale } from "./recover";
 
+type Scope = { workspaceId?: string };
+
+/** Adds .eq("workspace_id", id) for a scoped (development) tick. */
+function scoped<Q>(q: Q, scope: Scope): Q {
+  return scope.workspaceId ? (q as unknown as { eq: (col: string, v: string) => Q }).eq("workspace_id", scope.workspaceId) : q;
+}
+
 export type TickResult = { materialised: number; dialed: number; recovered: number; alerted: number };
 
-async function materialise(now: number) {
+async function materialise(now: number, scope: Scope) {
   const db = supabaseAdmin();
   const [reminders, people, settings, recent] = await Promise.all([
-    db.from("reminders").select("id, workspace_id, person_id, kind, reminder_text, time_of_day, repeat_rule, once_day, lang, created_at").eq("active", true),
+    scoped(db.from("reminders").select("id, workspace_id, person_id, kind, reminder_text, time_of_day, repeat_rule, once_day, lang, created_at").eq("active", true), scope),
     db.from("people").select("id, consent, lang, is_sample"),
     db.from("settings").select("*"),
-    db
-      .from("calls")
-      .select("reminder_id, scheduled_at, status")
+    scoped(db.from("calls").select("reminder_id, scheduled_at, status"), scope)
       .gte("scheduled_at", new Date(istDateAt(dayKeyIST(now), "00:00")).toISOString())
       .lt("scheduled_at", new Date(istDateAt(addDaysIST(now, 1), "00:00")).toISOString())
       .not("reminder_id", "is", null),
@@ -56,14 +61,12 @@ async function materialise(now: number) {
   return data?.length ?? 0;
 }
 
-async function dispatch(now: number) {
+async function dispatch(now: number, scope: Scope) {
   const db = supabaseAdmin();
   const iso = new Date(now).toISOString();
   return dispatchDue({
     async listDue(limit) {
-      const { data, error } = await db
-        .from("calls")
-        .select("id, status, workspace_id, workspaces(name)")
+      const { data, error } = await scoped(db.from("calls").select("id, status, workspace_id, workspaces(name)"), scope)
         .in("status", ["scheduled", "retry"])
         .or(`next_attempt_at.lte.${iso},and(next_attempt_at.is.null,scheduled_at.lte.${iso})`)
         .order("scheduled_at", { ascending: true })
@@ -87,14 +90,12 @@ async function dispatch(now: number) {
   });
 }
 
-async function recover(now: number) {
+async function recover(now: number, scope: Scope) {
   const db = supabaseAdmin();
   return recoverStale(
     {
       async listStale(before) {
-        const { data, error } = await db
-          .from("call_attempts")
-          .select("id")
+        const { data, error } = await scoped(db.from("call_attempts").select("id"), scope)
           .eq("status", "dialing")
           .lt("created_at", new Date(before).toISOString())
           .limit(20);
@@ -118,12 +119,14 @@ async function step<T>(name: string, fn: () => Promise<T>, fallback: T) {
 }
 
 /** One scheduler tick. Every step is idempotent, so retries and overlaps are safe. */
-export async function runTick(now = Date.now()): Promise<TickResult> {
-  const recovered = await step("recover", () => recover(now), 0);
-  const materialised = await step("materialise", () => materialise(now), 0);
-  const dialed = await step("dispatch", () => dispatch(now), 0);
-  const alerted = await step("alerts", () => sendPendingAlerts(), 0);
+export async function runTick(now = Date.now(), scope: Scope = {}): Promise<TickResult> {
+  const recovered = await step("recover", () => recover(now, scope), 0);
+  const materialised = await step("materialise", () => materialise(now, scope), 0);
+  const dialed = await step("dispatch", () => dispatch(now, scope), 0);
+  const alerted = await step("alerts", () => sendPendingAlerts({ workspaceId: scope.workspaceId }), 0);
   const result = { materialised, dialed, recovered, alerted };
+  // A scoped (test) tick does not count as the scheduler being alive.
+  if (scope.workspaceId) return result;
 
   await supabaseAdmin()
     .from("app_state")
