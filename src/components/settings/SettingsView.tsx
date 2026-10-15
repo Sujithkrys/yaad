@@ -9,6 +9,7 @@ import { api } from "@/lib/client/api";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/client/api";
 import { useFamily, useOwnerName, useSettings } from "@/lib/client/hooks";
+import { mobileDigits } from "@/lib/phone";
 import type { Settings } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
 
@@ -207,13 +208,13 @@ export function SettingsView() {
           <input
             className="input"
             aria-label="Alert number"
-            inputMode="numeric"
-            maxLength={11}
+            inputMode="tel"
+            maxLength={17}
             placeholder="98765 43210"
             disabled={!s.alert}
             defaultValue={s.alertNumber}
             key={`num-${s.alertNumber}`}
-            onBlur={(e) => e.target.value.replace(/\D/g, "") !== s.alertNumber && save({ alertNumber: e.target.value })}
+            onBlur={(e) => (mobileDigits(e.target.value) ?? e.target.value.trim()) !== s.alertNumber && save({ alertNumber: e.target.value })}
           />
         </Row>
       </Card>

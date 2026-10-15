@@ -3,30 +3,29 @@
 // Refuses numbers that are not in CALL_ALLOWLIST. Never prints secrets.
 
 const { renderGreeting } = await import("../src/lib/greetings.ts");
+const { normalizePhone, toE164 } = await import("../src/lib/phone.ts");
 
 const LANGS = { hi: "Hindi", te: "Telugu", ta: "Tamil", kn: "Kannada", en: "English" };
-
-function normalizePhone(raw) {
-  const m = /^(?:\+91|91|0)?([6-9]\d{9})$/.exec(String(raw ?? "").replace(/[\s-()]/g, ""));
-  return m ? `+91${m[1]}` : null;
-}
 
 function fail(msg) {
   console.error(msg);
   process.exit(1);
 }
 
-const phone = normalizePhone(process.argv[2]);
+const phone = normalizePhone(process.argv[2] ?? "");
 if (!phone) fail("Usage: pnpm call:test +91XXXXXXXXXX [hi|te|ta|kn|en]");
 const lang = (process.argv[3] ?? "hi").slice(0, 2).toLowerCase();
 if (!LANGS[lang]) fail(`Unknown language "${lang}". Use one of: ${Object.keys(LANGS).join(", ")}.`);
 
-const allow = (process.env.CALL_ALLOWLIST ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const allow = (process.env.CALL_ALLOWLIST ?? "").split(",").map((s) => toE164(s.trim())).filter(Boolean);
 if (!allow.includes(phone)) fail(`${phone} is not in CALL_ALLOWLIST. Add it to .env.local first.`);
 
 const need = ["SARVAM_API_KEY", "SARVAM_ORG_ID", "SARVAM_WORKSPACE_ID", "SARVAM_APP_ID", "SARVAM_APP_VERSION", "SARVAM_CONNECTION_ID", "SARVAM_AGENT_PHONE"];
 const missing = need.filter((k) => !process.env[k]);
 if (missing.length) fail(`Missing in .env.local: ${missing.join(", ")}`);
+
+const agentPhone = toE164(process.env.SARVAM_AGENT_PHONE);
+if (!agentPhone) fail("SARVAM_AGENT_PHONE is not a phone number. Use the agent's number, e.g. +918012345678.");
 
 const base = (process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
 const secret = process.env.SARVAM_WEBHOOK_SECRET ?? "";
@@ -37,7 +36,7 @@ const body = {
     app_id: process.env.SARVAM_APP_ID,
     app_version: Number(process.env.SARVAM_APP_VERSION),
     app_type: "agent",
-    connection_config: { connection_id: process.env.SARVAM_CONNECTION_ID, agent_phone_number: process.env.SARVAM_AGENT_PHONE },
+    connection_config: { connection_id: process.env.SARVAM_CONNECTION_ID, agent_phone_number: agentPhone },
     agent_variables: { person_name: "Test", reminder_text: "BP tablet", requester_name: "Yaad", user_name: "Yaad" },
     app_overrides: { initial_bot_message: renderGreeting(lang, "Test", "BP tablet"), initial_language_name: LANGS[lang] },
   },

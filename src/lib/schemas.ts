@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mobileDigits } from "./phone";
 
 // Request validation for the API routes. Rules match the database checks.
 
@@ -12,7 +13,7 @@ export const personInput = z.object({
   relation: z.string().trim().min(1).max(30).default("Other"),
   phone: z
     .string({ error: "Enter a 10 digit mobile number." })
-    .transform((s) => s.replace(/\D/g, ""))
+    .transform((s) => mobileDigits(s) ?? s)
     .pipe(z.string().regex(/^[6-9]\d{9}$/, "Enter a 10 digit mobile number.")),
   lang,
 });
@@ -37,7 +38,7 @@ export const settingsInput = z
     alertChannel: z.enum(["WhatsApp", "SMS", "Email"]),
     alertNumber: z
       .string()
-      .transform((s) => s.replace(/\D/g, ""))
+      .transform((s) => (s.trim() === "" ? "" : (mobileDigits(s) ?? s)))
       .pipe(z.string().regex(/^$|^[6-9]\d{9}$/, "Enter a 10 digit number for alerts, or leave it empty.")),
     alertEmail: z.union([z.literal(""), z.email("Enter a valid email address, or leave it empty.")]),
     retryMin: z.union([z.literal(5), z.literal(10), z.literal(15)], { error: "Retry after 5, 10 or 15 minutes." }),

@@ -128,7 +128,7 @@ export function SetupWizard() {
               <div className="two">
                 <div className="field">
                   <label htmlFor="wz-phone">Mobile number</label>
-                  <input id="wz-phone" className="input" inputMode="numeric" maxLength={11} placeholder="98765 43210" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <input id="wz-phone" className="input" inputMode="tel" maxLength={17} placeholder="98765 43210" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
                 <div className="field">
                   <label htmlFor="wz-lang">Language</label>
@@ -211,7 +211,7 @@ export function SetupWizard() {
                 Namaste {name.trim()}. {owner} has set up Yaad to call you at {fmtHHMM(time)} to remind you about {text.trim()},
                 in {langLabel}. Reply YES to allow these calls, or STOP at any time.
                 <small>
-                  Sent by SMS to +91 {phone.replace(/\D/g, "").replace(/(\d{5})(\d{5})/, "$1 $2")} on behalf of {owner}
+                  Sent by SMS to +91 {(cleanPhone(phone) ?? "").replace(/(\d{5})(\d{5})/, "$1 $2")} on behalf of {owner}
                 </small>
               </div>
               <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
