@@ -75,7 +75,7 @@ export function SetupWizard() {
         router.push("/dashboard");
         return;
       }
-      say(`Consent message sent to ${person.name}. Calls start after they agree.`);
+      say(`${person.name} added. Calls start once you press Mark as agreed.`);
       router.push("/family");
     } catch (e) {
       setError((e as Error).message);
@@ -206,18 +206,20 @@ export function SetupWizard() {
           {step === 3 ? (
             <>
               <h2>Ask {name.trim()} first</h2>
-              <p className="lead">Yaad only calls people who agree. We send this message now.</p>
+              <p className="lead">
+                Yaad only calls people who agree. It cannot send messages yet, so read this to {name.trim()} or send it yourself.
+              </p>
               <div className="consent-msg">
                 Namaste {name.trim()}. {owner} has set up Yaad to call you at {fmtHHMM(time)} to remind you about {text.trim()},
                 in {langLabel}. Reply YES to allow these calls, or STOP at any time.
                 <small>
-                  Sent by SMS to +91 {(cleanPhone(phone) ?? "").replace(/(\d{5})(\d{5})/, "$1 $2")} on behalf of {owner}
+                  For +91 {(cleanPhone(phone) ?? "").replace(/(\d{5})(\d{5})/, "$1 $2")} from {owner}
                 </small>
               </div>
               <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
                 <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 3 }} />
                 <span>
-                  {name.trim()} already agreed when I asked them. Skip the message and place a test call now.
+                  {name.trim()} agreed to these calls. Place a test call now.
                 </span>
               </label>
             </>
@@ -242,7 +244,7 @@ export function SetupWizard() {
             <MonoLabel as="span">Takes about a minute</MonoLabel>
           )}
           <Button type="submit" disabled={saving}>
-            {step < STEPS ? "Continue" : saving ? "Saving…" : agreed ? "Finish and test call" : "Send and finish"}
+            {step < STEPS ? "Continue" : saving ? "Saving…" : agreed ? "Finish and test call" : "Finish"}
           </Button>
         </div>
       </form>

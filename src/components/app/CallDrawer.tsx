@@ -15,6 +15,13 @@ const FAILURE_TEXT: Record<string, string> = {
   bad_phone: "The mobile number could not be dialled.",
   no_answer: "Nobody answered.",
   busy: "The line was busy.",
+  no_consent: "They have not agreed to calls yet. Press Mark as agreed on the Family page.",
+  sample_person: "Sample family members are never called for real.",
+  daily_limit: "The daily call limit was reached.",
+  sarvam_401: "Sarvam rejected the API key.",
+  sarvam_403: "Sarvam rejected the API key.",
+  sarvam_404: "Sarvam could not find the agent. Check the Sarvam ids in the server settings.",
+  sarvam_network: "Could not reach Sarvam.",
 };
 
 const RESPONSE_TEXT: Record<Response, string> = {

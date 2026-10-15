@@ -66,7 +66,7 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
       </div>
 
       {p.consent === "pending" ? (
-        <p className="warn">We sent {p.name} a message asking if it&apos;s okay to call. Calls start after they agree.</p>
+        <p className="warn">No calls until {p.name} agrees. Ask them, then press Mark as agreed.</p>
       ) : null}
 
       {confirming ? (
@@ -89,9 +89,6 @@ export function PersonCard({ person: p, reminders, adherencePct }: Props) {
             <>
               <Button size="sm" disabled={busy} onClick={() => run(() => api.grantConsent(p.id), `${p.name} agreed to calls.`).then(() => setBusy(false))}>
                 Mark as agreed
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => say(`Consent message sent again to ${p.name}.`)}>
-                Resend message
               </Button>
             </>
           ) : (

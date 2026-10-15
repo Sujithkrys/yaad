@@ -49,7 +49,7 @@ function PersonForm({ family, defaultLang, personId, onClose }: Props & { family
         say(`${data.name} updated.`);
       } else {
         await api.addPerson(data);
-        say(`Consent message sent to ${data.name}. Calls start after they agree.`);
+        say(`${data.name} added. Ask them if calls are okay, then press Mark as agreed.`);
       }
       onClose();
     } catch (err) {

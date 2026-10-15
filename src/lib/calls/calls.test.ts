@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { istDateAt } from "../time";
-import { languageName, normalizePhone, openingLine } from "./format";
+import { languageName, normalizePhone, openingLine, sarvamFailureMessage } from "./format";
 import { gateCall, type GateInput } from "./gate";
 import { isYes, resolveOutcome } from "./resolve";
 import { handleWebhook, verifyToken, type WebhookDeps } from "./webhook";
@@ -199,5 +199,21 @@ describe("webhook", () => {
 
   it("returns 400 for a payload without an attempt id", async () => {
     expect((await handleWebhook(secret, { status: "connected" }, deps(null))).status).toBe(400);
+  });
+});
+
+describe("sarvamFailureMessage", () => {
+  it("says what to check for each kind of refusal", () => {
+    expect(sarvamFailureMessage(0, "")).toMatch(/Could not reach Sarvam/);
+    expect(sarvamFailureMessage(401, "")).toMatch(/SARVAM_API_KEY/);
+    expect(sarvamFailureMessage(404, "")).toMatch(/SARVAM_APP_ID/);
+    expect(sarvamFailureMessage(503, "")).toMatch(/Try again/);
+  });
+
+  it("passes on Sarvam's own reason for a bad request", () => {
+    expect(sarvamFailureMessage(400, JSON.stringify({ detail: "Connection not found" }))).toContain("Connection not found");
+    const validation = { detail: [{ loc: ["body", "user_config", "user_phone_number"], msg: "invalid phone number" }] };
+    expect(sarvamFailureMessage(422, JSON.stringify(validation))).toContain("user_config.user_phone_number invalid phone number");
+    expect(sarvamFailureMessage(422, "not json")).toContain("not json");
   });
 });

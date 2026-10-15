@@ -5,14 +5,14 @@ import { after } from "next/server";
 import { ApiError } from "../api-error";
 import { transcriptFor } from "../conversation";
 import { getSettings } from "../db/repo";
-import { env } from "../env";
+import { env, liveConfig } from "../env";
 import { placeCall, SarvamError } from "../sarvam";
 import { supabaseAdmin } from "../supabase-admin";
 import { addDaysIST, dayKeyIST, istDateAt } from "../time";
 import type { Lang, Settings } from "../types";
 import type { Workspace } from "../workspace";
 import { applyResult, claimAttempt } from "./apply";
-import { languageName, normalizePhone, openingLine } from "./format";
+import { languageName, normalizePhone, openingLine, sarvamFailureMessage } from "./format";
 import { COOLDOWN_MS, gateCall, type GateDecision, type RefuseReason } from "./gate";
 import type { WebhookPayload } from "./webhook";
 
@@ -168,6 +168,18 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
   }
 
   const e = env();
+  if (e.CALL_MODE === "live") {
+    // Check before recording an attempt, so a setup problem never uses up the daily cap.
+    const { configured, ready } = liveConfig();
+    if (!ready) {
+      const missing = Object.entries(configured).filter(([, set]) => !set).map(([k]) => k);
+      const message = `Real calls are on, but these settings are missing on the server: ${missing.join(", ")}.`;
+      console.error("[calls]", message);
+      if (!claimed) throw new ApiError(503, message);
+      await db.from("calls").update({ status: claimed }).eq("id", call.id).eq("workspace_id", ws.id);
+      return { status: "failed", callId: call.id, message };
+    }
+  }
   const attemptNo = (call.attempt ?? 0) + 1;
   const lang = (call.lang ?? person.lang) as Lang;
 
@@ -200,7 +212,12 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
         console.error("[calls] simulated result failed", (err as Error).message);
       }
     });
-    return { status: "calling", callId: call.id, mode: "simulate", message: `Calling ${person.name} (simulated).` };
+    return {
+      status: "calling",
+      callId: call.id,
+      mode: "simulate",
+      message: `Simulated call to ${person.name}. No phone rings until real calls are turned on (CALL_MODE=live).`,
+    };
   }
 
   try {
@@ -226,7 +243,8 @@ export async function dialCall(ws: Workspace, callId: string, opts: { manual: bo
     const payload: WebhookPayload = { attempt_id: failId, status: "failed", failure_reason: reason };
     const got = await claimAttempt(failId, payload);
     if (got) await applyResult(got, payload);
-    return { status: "failed", callId: call.id, message: `The call to ${person.name} could not be placed. Try again in a few minutes.` };
+    const why = err instanceof SarvamError ? sarvamFailureMessage(err.status, err.body) : "Try again in a few minutes.";
+    return { status: "failed", callId: call.id, message: `The call to ${person.name} could not be placed. ${why}` };
   }
 }
 
