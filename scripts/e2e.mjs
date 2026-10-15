@@ -11,6 +11,7 @@ const KEY = process.env.SUPABASE_SECRET_KEY;
 const DEV = process.env.CRON_DEV_SECRET;
 const HOOK = process.env.SARVAM_WEBHOOK_SECRET;
 const TAG = `QA e2e ${Date.now().toString(36)}`;
+const PASS = "qa-password-1";
 for (const [k, v] of Object.entries({ SUPABASE_URL: SB, SUPABASE_SECRET_KEY: KEY, CRON_DEV_SECRET: DEV, SARVAM_WEBHOOK_SECRET: HOOK })) {
   if (!v) {
     console.error(`${k} is not set.`);
@@ -31,7 +32,10 @@ class Visitor {
       body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
     });
     const set = res.headers.get("set-cookie");
-    if (set && /yaad_ws=/.test(set)) this.cookie = set.split(";")[0];
+    if (set) {
+      const m = /yaad_session=([^;]*)/.exec(set);
+      if (m) this.cookie = m[1] ? `yaad_session=${m[1]}` : "";
+    }
     const text = await res.text();
     let json = null;
     try {
@@ -84,7 +88,7 @@ const phone = () => `91${String(10_000_000 + ((phoneSeq += 7) % 89_999_999)).pad
 
 async function workspace(label) {
   const v = new Visitor();
-  const r = await v.req("POST", "/api/workspace", { name: `${TAG} ${label}` });
+  const r = await v.req("POST", "/api/workspace", { name: `${TAG} ${label}`, password: PASS });
   if (r.status !== 200) throw new Error(`workspace ${label}: ${r.status} ${r.text.slice(0, 120)}`);
   v.id = r.json.workspace.id;
   return v;
@@ -190,15 +194,54 @@ await test("A", "first visit has no workspace and data routes ask for a name", a
   const f = await v.req("GET", "/api/family");
   expect(f.status === 401 && typeof f.json?.error === "string", `family ${f.status}`);
 });
-await test("A", "claiming a name sets an httpOnly cookie and starts empty", async () => {
+await test("A", "creating an account sets an httpOnly session cookie and starts empty", async () => {
   A = await workspace("A");
   const [f, r, c] = await Promise.all([A.req("GET", "/api/family"), A.req("GET", "/api/reminders"), A.req("GET", "/api/calls")]);
-  expect(A.cookie.startsWith("yaad_ws="), "no cookie");
+  expect(A.cookie.startsWith("yaad_session="), "no session cookie");
   expect(f.json.length === 0 && r.json.length === 0 && c.json.length === 0, "not empty");
 });
-await test("A", "the same name is reserved for a second visitor", async () => {
-  const r = await new Visitor().req("POST", "/api/workspace", { name: `${TAG.toUpperCase()} a` });
-  expect(r.status === 409 && /reserved/.test(r.json?.error), `${r.status} ${r.text.slice(0, 80)}`);
+await test("A", "a taken username is refused, whatever the case", async () => {
+  const r = await new Visitor().req("POST", "/api/workspace", { name: `${TAG.toUpperCase()} a`, password: "another-pass-1" });
+  expect(r.status === 409 && r.json?.error === "This username is already taken. Choose another one.", `${r.status} ${r.text.slice(0, 90)}`);
+});
+await test("A", "passwords must be at least 8 characters", async () => {
+  const r = await new Visitor().req("POST", "/api/workspace", { name: `${TAG} short`, password: "1234567" });
+  expect(r.status === 400 && /8 characters/.test(r.json?.error), `${r.status} ${r.text.slice(0, 90)}`);
+});
+await test("A", "log in on a second device with username and password; wrong password refused", async () => {
+  await A.req("POST", "/api/family", { name: "Shared", phone: phone(), lang: "hi-IN" });
+  const phone2 = new Visitor();
+  const bad = await phone2.req("POST", "/api/workspace/login", { name: `${TAG} A`, password: "wrong-password" });
+  expect(bad.status === 401 && bad.json?.error === "Wrong username or password.", `wrong pw ${bad.status}`);
+  const ok = await phone2.req("POST", "/api/workspace/login", { name: `${TAG.toLowerCase()} a`, password: PASS });
+  expect(ok.status === 200 && ok.json?.workspace?.id === A.id, `login ${ok.status} ${ok.text.slice(0, 80)}`);
+  const fam = await phone2.req("GET", "/api/family");
+  expect(fam.json.some((p) => p.name === "Shared"), "second device does not see the same data");
+  const out = await phone2.req("POST", "/api/workspace/logout");
+  const after = await phone2.req("GET", "/api/family");
+  expect(out.status === 200 && after.status === 401, `logout ${out.status}, then ${after.status}`);
+  const still = await A.req("GET", "/api/family");
+  expect(still.status === 200, "logging out one device logged out the other");
+  await A.req("DELETE", `/api/family/${fam.json.find((p) => p.name === "Shared").id}`);
+});
+await test("A", "an account without a password cannot be logged into; its owner can set one", async () => {
+  const [legacy] = await db.insert("workspaces", [{ name: `${TAG} legacy` }]);
+  await db.insert("settings", [{ workspace_id: legacy.id }]);
+  const r = await new Visitor().req("POST", "/api/workspace/login", { name: `${TAG} legacy`, password: "anything-123" });
+  expect(r.status === 403 && /no password yet/.test(r.json?.error), `${r.status} ${r.text.slice(0, 80)}`);
+  const owner = new Visitor();
+  owner.cookie = `yaad_ws=${legacy.id}`;
+  const me = await owner.req("GET", "/api/workspace");
+  expect(me.json?.workspace?.hasPassword === false, "owner not recognised by the old cookie");
+  const set = await owner.req("POST", "/api/workspace/password", { password: "legacy-pass-1" });
+  expect(set.status === 200 && set.json.workspace.hasPassword && owner.cookie.startsWith("yaad_session="), `set ${set.status}`);
+  const other = new Visitor();
+  const ok = await other.req("POST", "/api/workspace/login", { name: `${TAG} legacy`, password: "legacy-pass-1" });
+  expect(ok.status === 200, `login after setting ${ok.status}`);
+  const old = new Visitor();
+  old.cookie = `yaad_ws=${legacy.id}`;
+  const gone = await old.req("GET", "/api/workspace");
+  expect(gone.json?.workspace === null, "the old cookie still works after a password was set");
 });
 
 // B. People
@@ -246,6 +289,8 @@ await test("C", "create, edit, pause, resume and delete a reminder 2 minutes ahe
 let B, bPeople, slotCallId;
 await test("D", "tick three times: exactly one call at the right UTC time", async () => {
   B = await workspace("B");
+  // These tests are not about quiet hours; keep them valid at any time of day.
+  await settings(B, { quietOn: false });
   bPeople = [await person(B, { name: "Amma" }), await person(B, { name: "Nanna" }), await person(B, { name: "Dadi", lang: "hi-IN" })];
   const time = hhmm(Date.now() + 60_000);
   const rem = await reminder(B, bPeople[0].id, time);
@@ -302,7 +347,7 @@ await test("E", "demo_outcome noanswer on the last attempt -> missed", async () 
 await test("F", "later_minutes=10 reschedules ~10 minutes ahead; the next dial increments attempt; last attempt -> missed with one alert", async () => {
   const C = await workspace("C");
   const p = await person(C, { name: "Paati", lang: "ta-IN" });
-  await settings(C, { maxAttempts: 2, demoOutcome: "noanswer" });
+  await settings(C, { maxAttempts: 2, demoOutcome: "noanswer", quietOn: false });
   const { callId, attemptId } = await ringing(C, p);
   const h = await hook({ attempt_id: attemptId, status: "connected", duration: 20, final_agent_variables: { response: "later", later_minutes: 10 } });
   expect(h.status === 200, `webhook ${h.status}`);
@@ -450,7 +495,7 @@ await test("I", "tick without the dev secret or a QStash signature -> 401", asyn
 await test("J", "attempt stuck in dialing for 10+ minutes -> failed (webhook_timeout), call retries", async () => {
   const J = await workspace("J");
   const p = await person(J, { name: "Mama", lang: "kn-IN" });
-  await settings(J, { maxAttempts: 2 });
+  await settings(J, { maxAttempts: 2, quietOn: false });
   const { callId, attemptId } = await ringing(J, p, { ageMs: 11 * 60_000 });
   const t = await tick(J);
   const [a] = await db.get("call_attempts", `sarvam_attempt_id=eq.${attemptId}&select=status,failure_reason`);
@@ -475,6 +520,8 @@ await test("K", "bad input returns clean JSON errors without stack traces", asyn
     ["POST", "/api/calls", {}],
     ["POST", `/api/calls/${uuid}/dial`],
     ["POST", "/api/workspace", { name: "" }],
+    ["POST", "/api/workspace/login", {}],
+    ["POST", "/api/workspace/password", { password: "short" }],
     ["POST", "/api/tts", {}],
     ["POST", "/api/seed"],
   ];

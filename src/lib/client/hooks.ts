@@ -4,9 +4,9 @@ import useSWR, { type SWRResponse } from "swr";
 import type { Adherence, Call, Dashboard, Person, Reminder, Settings } from "@/lib/types";
 import { fetcher } from "./api";
 
-export type WorkspaceInfo = { id: string; name: string };
+export type WorkspaceInfo = { id: string; name: string; hasPassword: boolean };
 
-/** This browser's named workspace; `null` until the visitor picks a name. */
+/** The logged-in account; `null` until this browser logs in or creates one. */
 export function useWorkspace() {
   const res = useSWR<{ workspace: WorkspaceInfo | null }>("/api/workspace", fetcher);
   return { workspace: res.data?.workspace, loading: !res.data && !res.error, error: res.error };

@@ -1,17 +1,12 @@
 import { z } from "zod";
-import { errorResponse, readJson } from "@/lib/api";
-import { claimWorkspace, currentWorkspace, renameWorkspace, requireWorkspace } from "@/lib/workspace";
+import { ApiError, errorResponse, readJson } from "@/lib/api";
+import { credentials, username } from "@/lib/auth/schemas";
+import { clientIp, createRateLimiter } from "@/lib/server/rate-limit";
+import { createAccount, currentWorkspace, renameWorkspace, requireWorkspace } from "@/lib/workspace";
 
-const nameInput = z.object({
-  name: z
-    .string({ error: "Write your name." })
-    .trim()
-    .min(2, "Names need at least 2 characters.")
-    .max(40, "Names can be up to 40 characters.")
-    .regex(/^[\p{L}\p{M}\p{N} .'-]+$/u, "Use letters, numbers, spaces, dots or dashes."),
-});
+const signupLimit = createRateLimiter({ limit: 10, windowMs: 60 * 60_000 });
 
-/** { workspace: { id, name } } or { workspace: null } when this browser has none yet. */
+/** { workspace: { id, name, hasPassword } } or { workspace: null } when not logged in. */
 export async function GET() {
   try {
     return Response.json({ workspace: await currentWorkspace() });
@@ -20,22 +15,26 @@ export async function GET() {
   }
 }
 
-/** Claim a unique name and create this browser's workspace. */
+/** Create an account (unique username + password) and log this browser in. */
 export async function POST(request: Request) {
   try {
-    const { name } = nameInput.parse(await readJson(request));
-    return Response.json({ workspace: await claimWorkspace(name) });
+    // Production only, so local test runs can create many accounts.
+    if (process.env.NODE_ENV === "production" && !signupLimit(clientIp(request)).ok) {
+      throw new ApiError(429, "Too many new accounts from this device. Try again later.");
+    }
+    const { name, password } = credentials.parse(await readJson(request));
+    return Response.json({ workspace: await createAccount(name, password) });
   } catch (err) {
     return errorResponse(err);
   }
 }
 
-/** Rename this browser's workspace. */
+/** Rename the account. The new username must also be free. */
 export async function PATCH(request: Request) {
   try {
     const ws = await requireWorkspace();
-    const { name } = nameInput.parse(await readJson(request));
-    return Response.json({ workspace: await renameWorkspace(ws.id, name) });
+    const { name } = z.object({ name: username }).parse(await readJson(request));
+    return Response.json({ workspace: await renameWorkspace(ws, name) });
   } catch (err) {
     return errorResponse(err);
   }

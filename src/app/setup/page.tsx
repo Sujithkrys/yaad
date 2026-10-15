@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand } from "@/components/shell/Brand";
-import { NamePrompt } from "@/components/app/NamePrompt";
+import { AccountPrompt } from "@/components/app/AccountPrompt";
 import { SetupWizard } from "@/components/setup/SetupWizard";
 import { buttonClass } from "@/components/ui";
 
@@ -21,7 +21,7 @@ export default function SetupPage() {
       <main>
         <SetupWizard />
       </main>
-      <NamePrompt />
+      <AccountPrompt />
     </div>
   );
 }

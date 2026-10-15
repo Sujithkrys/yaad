@@ -46,3 +46,4 @@ next-env.d.ts
 
 # Screenshots and recordings for marketing
 /launch-media/
+/qa-screenshots/

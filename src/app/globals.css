@@ -517,3 +517,6 @@ dialog.drawer .dlg { width: min(460px, 100vw); height: 100vh; max-height: 100vh;
 .bell-list li[data-kind="unwell"] .sq { background: var(--warn); }
 .bell-list li[data-kind="info"] .sq { background: var(--good); }
 .bell-empty { margin: 0; padding: 10px; color: var(--ink-2); font-size: 12.5px; }
+
+/* password nudge */
+.nudge { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px; }

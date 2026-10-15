@@ -11,6 +11,7 @@ import { fetcher } from "@/lib/client/api";
 import { useFamily, useOwnerName, useSettings } from "@/lib/client/hooks";
 import type { Settings } from "@/lib/types";
 import { LANGUAGES } from "@/lib/voices";
+import { LogoutRow, PasswordRow } from "./AccountRows";
 
 function SchedulerChip({ seconds }: { seconds: number | null }) {
   if (seconds === null) return <Pill variant="missed">Not running</Pill>;
@@ -220,11 +221,11 @@ export function SettingsView() {
 
       <h2 className="set-title">Account</h2>
       <Card className="set-card">
-        <Row title="Your name" desc="Names your space and tells your family who set the reminder. Each name can be used once.">
+        <Row title="Username" desc="You log in with it, and your family hears it as the person who set the reminder. Each username can be used once.">
           <input
             className="input"
-            aria-label="Your name"
-            maxLength={30}
+            aria-label="Username"
+            maxLength={40}
             defaultValue={owner}
             key={`name-${owner}`}
             onBlur={async (e) => {
@@ -242,10 +243,11 @@ export function SettingsView() {
                 return;
               }
               await mutate("/api/workspace", body, { revalidate: false });
-              say("Name saved.");
+              say("Username saved.");
             }}
           />
         </Row>
+        <PasswordRow />
         <Row
           title="Sample data"
           desc={empty ? "Load a sample family with reminders and four weeks of calls." : "Remove all people, reminders and calls. Settings are kept."}
@@ -269,6 +271,7 @@ export function SettingsView() {
             </Button>
           )}
         </Row>
+        <LogoutRow />
       </Card>
     </div>
   );

@@ -10,7 +10,10 @@ import { placeCall, SarvamError } from "../sarvam";
 import { supabaseAdmin } from "../supabase-admin";
 import { addDaysIST, dayKeyIST, istDateAt } from "../time";
 import type { Lang, Settings } from "../types";
-import type { Workspace } from "../workspace";
+import type { Workspace as Account } from "../workspace";
+
+/** Dialling only needs the account id and its name (the person who set the reminder). */
+type Workspace = Pick<Account, "id" | "name">;
 import { applyResult, claimAttempt } from "./apply";
 import { languageName, normalizePhone, openingLine } from "./format";
 import { COOLDOWN_MS, gateCall, type GateDecision, type RefuseReason } from "./gate";

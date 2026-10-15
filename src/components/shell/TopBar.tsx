@@ -17,7 +17,9 @@ export function TopBar() {
   const dialogs = useDialogs();
   const family = useFamily().data;
   const reminders = useReminders().data;
-  const dash = useDashboard().data;
+  // now === 0 is the placeholder shown before login; it is not a real date.
+  const dashData = useDashboard().data;
+  const dash = dashData?.now ? dashData : undefined;
   const calls = useCalls({}).data;
   const name = useOwnerName();
 
